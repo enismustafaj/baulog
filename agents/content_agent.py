@@ -4,7 +4,12 @@ Reads relevancy agent output, extracts the targeted section from the
 property Markdown file, asks the LLM to adjust it, and writes back.
 """
 
+import json
 import os
+import sqlite3
+import subprocess
+import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -39,10 +44,24 @@ class ContentAgent:
         )
         self.parser = MarkdownParser()
         self.engine = ContextEngine(repo_path=PROPERTIES_DIR)
+        self._sessions_dir = Path(".baulog") / "entire-sessions"
+        self._db_path = Path(".baulog") / "adjustments.db"
+        self._init_db()
 
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
+
+    def history(self, limit: int = 20) -> list[dict[str, Any]]:
+        """Return the most recent adjustment summaries from the database."""
+        if not self._db_path.exists():
+            return []
+        with sqlite3.connect(self._db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                "SELECT * FROM adjustments ORDER BY timestamp DESC LIMIT ?", (limit,)
+            ).fetchall()
+        return [dict(row) for row in rows]
 
     def adjust(
         self,
@@ -66,11 +85,18 @@ class ContentAgent:
         category = relevancy_output.get("category") or ""
         action = relevancy_output.get("action") or ""
 
+        session_id = str(uuid.uuid4())
+        self._sessions_dir.mkdir(parents=True, exist_ok=True)
+        session_ref = str(self._sessions_dir / f"{session_id}.jsonl")
+
+        self._fire_hook("session-start", session_id, session_ref, action)
+
         path = self._resolve_markdown_path(markdown_path, property_name)
 
         sections = self.parser.parse_file(path)
         target = self._find_section(sections, property_name, building_name, unit_name, category)
         if target is None:
+            self._fire_hook("session-end", session_id, session_ref, action)
             raise ValueError(
                 f"No section found for property={property_name!r}, "
                 f"building={building_name!r}, unit={unit_name!r}, "
@@ -81,13 +107,23 @@ class ContentAgent:
         adjusted_body = self._call_llm(original_body, action, category)
         self._write_back(path, target, adjusted_body)
 
-        return {
+        result = {
             "updated": True,
             "markdown_path": str(path),
             "section_path": " > ".join(target.path),
             "original_content": original_body,
             "adjusted_content": adjusted_body,
         }
+
+        # Append result to session transcript so the stop hook can read it
+        with open(session_ref, "a", encoding="utf-8") as fh:
+            fh.write(json.dumps(result) + "\n")
+
+        self._save_summary(session_id, session_ref, relevancy_output)
+
+        # Fire stop in background — checkpoint creation can take several seconds
+        self._fire_hook("stop", session_id, session_ref, action, background=True)
+        return result
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -208,5 +244,92 @@ class ContentAgent:
         updated = lines[:body_start] + new_body_lines + lines[body_end:]
         path.write_text("".join(updated), encoding="utf-8")
 
+    def _init_db(self) -> None:
+        self._db_path.parent.mkdir(parents=True, exist_ok=True)
+        with sqlite3.connect(self._db_path) as conn:
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS adjustments (
+                    id            TEXT PRIMARY KEY,
+                    timestamp     TEXT,
+                    property      TEXT,
+                    building      TEXT,
+                    unit          TEXT,
+                    category      TEXT,
+                    action        TEXT,
+                    section_path  TEXT,
+                    markdown_path TEXT,
+                    summary       TEXT
+                )
+            """)
+
+    def _save_summary(
+        self,
+        session_id: str,
+        session_ref: str,
+        relevancy_output: dict[str, Any],
+    ) -> None:
+        try:
+            entry = json.loads(Path(session_ref).read_text(encoding="utf-8").splitlines()[0])
+        except (OSError, json.JSONDecodeError, IndexError):
+            return
+        property_ = relevancy_output.get("property", "")
+        building  = relevancy_output.get("building", "")
+        unit      = relevancy_output.get("unit", "")
+        category  = relevancy_output.get("category", "")
+        action    = relevancy_output.get("action", "")
+        summary   = f"{property_} · {building} · {unit} · {category}: {action}"
+
+        with sqlite3.connect(self._db_path) as conn:
+            conn.execute(
+                """INSERT OR REPLACE INTO adjustments
+                   (id, timestamp, property, building, unit, category, action, section_path, markdown_path, summary)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    session_id,
+                    datetime.now(timezone.utc).isoformat(),
+                    property_, building, unit, category, action,
+                    entry.get("section_path", ""),
+                    entry.get("markdown_path", ""),
+                    summary,
+                ),
+            )
+
     def _normalize(self, value: str) -> str:
         return " ".join(str(value).casefold().strip().strip(":").split())
+
+    def _fire_hook(
+        self,
+        hook_name: str,
+        session_id: str,
+        session_ref: str,
+        prompt: str,
+        background: bool = False,
+    ) -> None:
+        payload = json.dumps({
+            "hook_type": hook_name,
+            "session_id": session_id,
+            "session_ref": session_ref,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "user_prompt": prompt,
+        }).encode()
+        # Augment PATH so `entire` is found even when invoked from restricted shells
+        env = os.environ.copy()
+        extra = os.path.expanduser("~/.local/bin")
+        if extra not in env.get("PATH", ""):
+            env["PATH"] = extra + ":" + env.get("PATH", "")
+        try:
+            proc = subprocess.Popen(
+                ["entire", "hooks", "baulog", hook_name],
+                stdin=subprocess.PIPE,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                env=env,
+            )
+            if background:
+                proc.stdin.write(payload)
+                proc.stdin.close()
+                # Entire creates the checkpoint; let it finish in the background
+            else:
+                proc.communicate(input=payload, timeout=30)
+        except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
+            pass
