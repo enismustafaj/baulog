@@ -42,12 +42,8 @@ class ContentAgent:
             temperature=0.3,
         )
         self.parser = MarkdownParser()
-<<<<<<< HEAD
         self.engine = ContextEngine(repo_path=repo_path)
         self._sessions_dir = Path(self.engine.repo_path) / ".baulog" / "entire-sessions"
-=======
-        self.engine = ContextEngine(repo_path=PROPERTIES_DIR)
->>>>>>> f0101febd7fa90fa66aedeeed6df495d877189f3
 
     # ------------------------------------------------------------------
     # Public API
