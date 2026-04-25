@@ -1,0 +1,154 @@
+{
+  "cli_version": "0.5.6",
+  "checkpoint_id": "0639276a58a0",
+  "session_id": "4b1935f2-997b-4117-aaed-e129ed1ceae6",
+  "strategy": "manual-commit",
+  "created_at": "2026-04-25T23:10:06.755609Z",
+  "branch": "main",
+  "checkpoints_count": 11,
+  "files_touched": [
+    ".gitignore",
+    "agents/config.py",
+    "agents/content_agent.py",
+    "agents/relevancy_agent.py",
+    "main.py",
+    "queue_manager.py",
+    "worker.py"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-sonnet-4-6",
+  "turn_id": "2bedb8267e99",
+  "checkpoint_transcript_start": 713,
+  "transcript_lines_at_start": 713,
+  "token_usage": {
+    "input_tokens": 96,
+    "cache_creation_tokens": 70200,
+    "cache_read_tokens": 15401025,
+    "output_tokens": 43174,
+    "api_call_count": 72
+  },
+  "session_metrics": {
+    "turn_count": 30
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-04-25T23:10:06.730303Z",
+    "agent_lines": 343,
+    "agent_removed": 33,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 343,
+    "total_lines_changed": 376,
+    "agent_percentage": 100,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0
+    },
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 1,
+      "user_lines_removed": 0,
+      "agent_lines_added": 18,
+      "agent_lines_removed": 1,
+      "user_added_per_file": {
+        ".baulog/entire-sessions/05e154a1-0673-457e-a9d2-fb4c08029a51.jsonl": 1
+      }
+    },
+    {
+      "checkpoint_number": 3,
+      "user_lines_added": 1,
+      "user_lines_removed": 0,
+      "agent_lines_added": 36,
+      "agent_lines_removed": 2,
+      "user_added_per_file": {
+        ".baulog/entire-sessions/05e154a1-0673-457e-a9d2-fb4c08029a51.jsonl": 1
+      }
+    },
+    {
+      "checkpoint_number": 4,
+      "user_lines_added": 1,
+      "user_lines_removed": 0,
+      "agent_lines_added": 46,
+      "agent_lines_removed": 10,
+      "user_added_per_file": {
+        ".baulog/entire-sessions/05e154a1-0673-457e-a9d2-fb4c08029a51.jsonl": 1
+      }
+    },
+    {
+      "checkpoint_number": 5,
+      "user_lines_added": 1,
+      "user_lines_removed": 0,
+      "agent_lines_added": 73,
+      "agent_lines_removed": 24,
+      "user_added_per_file": {
+        ".baulog/entire-sessions/05e154a1-0673-457e-a9d2-fb4c08029a51.jsonl": 1
+      }
+    },
+    {
+      "checkpoint_number": 6,
+      "user_lines_added": 1,
+      "user_lines_removed": 0,
+      "agent_lines_added": 75,
+      "agent_lines_removed": 26,
+      "user_added_per_file": {
+        ".baulog/entire-sessions/05e154a1-0673-457e-a9d2-fb4c08029a51.jsonl": 1
+      }
+    },
+    {
+      "checkpoint_number": 7,
+      "user_lines_added": 1,
+      "user_lines_removed": 0,
+      "agent_lines_added": 96,
+      "agent_lines_removed": 25,
+      "user_added_per_file": {
+        ".baulog/entire-sessions/05e154a1-0673-457e-a9d2-fb4c08029a51.jsonl": 1
+      }
+    },
+    {
+      "checkpoint_number": 8,
+      "user_lines_added": 2,
+      "user_lines_removed": 0,
+      "agent_lines_added": 119,
+      "agent_lines_removed": 30,
+      "user_added_per_file": {
+        ".baulog/entire-sessions/05e154a1-0673-457e-a9d2-fb4c08029a51.jsonl": 1,
+        ".baulog/entire-sessions/661812eb-9118-41ae-a6a2-1577e9a668c4.jsonl": 1
+      }
+    },
+    {
+      "checkpoint_number": 9,
+      "user_lines_added": 2,
+      "user_lines_removed": 0,
+      "agent_lines_added": 143,
+      "agent_lines_removed": 38,
+      "user_added_per_file": {
+        ".baulog/entire-sessions/05e154a1-0673-457e-a9d2-fb4c08029a51.jsonl": 1,
+        ".baulog/entire-sessions/661812eb-9118-41ae-a6a2-1577e9a668c4.jsonl": 1
+      }
+    },
+    {
+      "checkpoint_number": 10,
+      "user_lines_added": 2,
+      "user_lines_removed": 0,
+      "agent_lines_added": 183,
+      "agent_lines_removed": 38,
+      "user_added_per_file": {
+        ".baulog/entire-sessions/05e154a1-0673-457e-a9d2-fb4c08029a51.jsonl": 1,
+        ".baulog/entire-sessions/661812eb-9118-41ae-a6a2-1577e9a668c4.jsonl": 1
+      }
+    },
+    {
+      "checkpoint_number": 11,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 187,
+      "agent_lines_removed": 40
+    }
+  ]
+}
