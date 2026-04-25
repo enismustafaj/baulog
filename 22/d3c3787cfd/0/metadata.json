@@ -1,0 +1,39 @@
+{
+  "cli_version": "0.5.6",
+  "checkpoint_id": "22d3c3787cfd",
+  "session_id": "c5857241-d99f-453f-a95a-353caac8d9ee",
+  "strategy": "manual-commit",
+  "created_at": "2026-04-25T20:08:11.778246Z",
+  "branch": "main",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "agents/content_agent.py"
+  ],
+  "agent": "Baulog",
+  "model": "",
+  "turn_id": "04296bbbd622",
+  "session_metrics": {
+    "turn_count": 1
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-04-25T20:08:11.758254Z",
+    "agent_lines": 58,
+    "agent_removed": 1,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 58,
+    "total_lines_changed": 59,
+    "agent_percentage": 100,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0
+    }
+  ]
+}
