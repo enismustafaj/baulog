@@ -11,6 +11,8 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate
 from pydantic import BaseModel, Field
 
+from agents.config import GEMINI_MODEL
+
 load_dotenv()
 
 
@@ -42,7 +44,7 @@ class RelevancyAgent:
                 )
 
         self.llm = ChatGoogleGenerativeAI(
-            model="gemini-1.5-flash",
+            model=GEMINI_MODEL,
             google_api_key=api_key,
             temperature=0,
         )

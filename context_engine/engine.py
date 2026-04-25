@@ -200,4 +200,5 @@ class ContextEngine:
         return " ".join(str(value).casefold().split())
 
 
-context_engine = ContextEngine()
+import os as _os
+context_engine = ContextEngine(repo_path=_os.getenv("BAULOG_PROPERTIES_DIR", "data/properties"))
