@@ -1,0 +1,1223 @@
+just to double check, does the current markdown parse parse this:
+
+---
+
+just to double check, does the current markdown parse parse this: # WEG Immanuelkirchstraße 26
+
+## insurance
+
+## maintanance
+
+## buildings:
+
+- ### 12
+   #### maintenance
+
+  #### rent
+
+- ### 14
+   #### maintenance
+
+  #### rent
+
+- ### 16
+   #### maintenance
+
+  #### rent
+
+#### units:
+
+- ##### WE 01
+###### maintenance
+
+###### rent
+
+###### tenant
+
+- ##### WE 02
+###### maintenance
+
+###### rent
+
+###### tenant
+
+- ##### WE 03
+###### maintenance
+
+###### rent
+
+###### tenant
+
+- ##### WE 04
+###### maintenance
+
+###### rent
+
+###### tenant
+
+- ##### WE 05
+###### maintenance
+
+###### rent
+
+###### tenant
+
+- ##### WE 06
+###### maintenance
+
+###### rent
+
+###### tenant
+
+- ##### WE 07
+###### maintenance
+
+###### rent
+
+###### tenant
+
+- ##### WE 08
+###### maintenance
+
+###### rent
+
+###### tenant
+
+- ##### WE 09
+###### maintenance
+
+###### rent
+
+###### tenant
+
+- ##### WE 10
+###### maintenance
+
+###### rent
+
+###### tenant
+
+- ##### WE 11
+###### maintenance
+
+###### rent
+
+###### tenant
+
+- ##### WE 12
+###### maintenance
+
+###### rent
+
+###### tenant
+
+- ##### WE 13
+###### maintenance
+
+###### rent
+
+###### tenant
+
+- ##### WE 14
+###### maintenance
+
+###### rent
+
+###### tenant
+
+- ##### WE 15
+###### maintenance
+
+###### rent
+
+###### tenant
+
+- ##### WE 16
+###### maintenance
+
+###### rent
+
+###### tenant
+
+- ##### WE 17
+###### maintenance
+
+###### rent
+
+###### tenant
+
+- ##### TG 18
+###### maintenance
+
+###### rent
+
+###### tenant
+
+- ##### WE 19
+###### maintenance
+
+###### rent
+
+###### tenant
+
+- ##### WE 20
+###### maintenance
+
+###### rent
+
+###### tenant
+
+- ##### WE 21
+###### maintenance
+
+###### rent
+
+###### tenant
+
+- ##### WE 22
+###### maintenance
+
+###### rent
+
+###### tenant
+
+- ##### WE 23
+###### maintenance
+
+###### rent
+
+###### tenant
+
+- ##### WE 24
+###### maintenance
+
+###### rent
+
+###### tenant
+
+- ##### WE 25
+###### maintenance
+
+###### rent
+
+###### tenant
+
+- ##### WE 26
+###### maintenance
+
+###### rent
+
+###### tenant
+
+- ##### WE 27
+###### maintenance
+
+###### rent
+
+###### tenant
+
+- ##### WE 28
+###### maintenance
+
+###### rent
+
+###### tenant
+
+- ##### WE 29
+###### maintenance
+
+###### rent
+
+###### tenant
+
+- ##### WE 30
+###### maintenance
+
+###### rent
+
+###### tenant
+
+- ##### WE 31
+###### maintenance
+
+###### rent
+
+###### tenant
+
+- ##### WE 32
+###### maintenance
+
+###### rent
+
+###### tenant
+
+- ##### WE 33
+###### maintenance
+
+###### rent
+
+###### tenant
+
+- ##### WE 34
+###### maintenance
+
+###### rent
+
+###### tenant
+
+- ##### WE 35
+###### maintenance
+
+###### rent
+
+###### tenant
+
+- ##### WE 36
+###### maintenance
+
+###### rent
+
+###### tenant
+
+- ##### GE 37
+###### maintenance
+
+###### rent
+
+###### tenant
+
+- ##### TG 38
+###### maintenance
+
+###### rent
+
+###### tenant
+
+- ##### WE 39
+###### maintenance
+
+###### rent
+
+###### tenant
+
+- ##### WE 40
+###### maintenance
+
+###### rent
+
+###### tenant
+
+- ##### WE 41
+###### maintenance
+
+###### rent
+
+###### tenant
+
+- ##### WE 42
+###### maintenance
+
+###### rent
+
+###### tenant
+
+- ##### WE 43
+###### maintenance
+
+###### rent
+
+###### tenant
+
+- ##### WE 44
+###### maintenance
+
+###### rent
+
+###### tenant
+
+- ##### WE 45
+###### maintenance
+
+###### rent
+
+###### tenant
+
+- ##### WE 46
+###### maintenance
+
+###### rent
+
+###### tenant
+
+- ##### WE 47
+###### maintenance
+
+###### rent
+
+###### tenant
+
+- ##### WE 48
+###### maintenance
+
+###### rent
+
+###### tenant
+
+- ##### WE 49
+###### maintenance
+
+###### rent
+
+###### tenant
+
+- ##### WE 50
+###### maintenance
+
+###### rent
+
+###### tenant
+
+- ##### WE 51
+###### maintenance
+
+###### rent
+
+###### tenant
+
+- ##### TG 52
+###### maintenance
+
+###### rent
+
+###### tenant
+
+---
+
+make sure that the markdown parser can parse the following markdown. the hierarch is this: property has buildings and each building has units, for the rent, maintenance, tenant, they are empty for now but they should have a list of string as elements under them: # WEG Immanuelkirchstraße 26
+
+## insurance
+
+## maintanance
+
+## buildings:
+
+### building 12
+#### maintenance
+
+#### rent
+
+### building 14
+#### maintenance
+
+#### rent
+
+### building 16
+#### maintenance
+
+#### rent
+
+#### units:
+
+##### unit WE 01
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 02
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 03
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 04
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 05
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 06
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 07
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 08
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 09
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 10
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 11
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 12
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 13
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 14
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 15
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 16
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 17
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit TG 18
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 19
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 20
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 21
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 22
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 23
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 24
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 25
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 26
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 27
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 28
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 29
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 30
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 31
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 32
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 33
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 34
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 35
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 36
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit GE 37
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit TG 38
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 39
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 40
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 41
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 42
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 43
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 44
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 45
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 46
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 47
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 48
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 49
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 50
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 51
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit TG 52
+###### maintenance
+
+###### rent
+
+###### tenant
+
+---
+
+add this to the file that is repesenting the property in the filesystem from which the application is reading from: # WEG Immanuelkirchstraße 26
+
+## insurance
+
+## maintanance
+
+## buildings:
+
+### building 12
+#### maintenance
+
+#### rent
+
+### building 14
+#### maintenance
+
+#### rent
+
+### building 16
+#### maintenance
+
+#### rent
+
+#### units:
+
+##### unit WE 01
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 02
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 03
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 04
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 05
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 06
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 07
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 08
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 09
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 10
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 11
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 12
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 13
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 14
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 15
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 16
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 17
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit TG 18
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 19
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 20
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 21
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 22
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 23
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 24
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 25
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 26
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 27
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 28
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 29
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 30
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 31
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 32
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 33
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 34
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 35
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 36
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit GE 37
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit TG 38
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 39
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 40
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 41
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 42
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 43
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 44
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 45
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 46
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 47
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 48
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 49
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 50
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit WE 51
+###### maintenance
+
+###### rent
+
+###### tenant
+
+##### unit TG 52
+###### maintenance
+
+###### rent
+
+###### tenant
+
+---
+
+for the file upload endpoints, how would the request look like in postman?
+
+---
+
+add logs for each worker to output what data is being sent to the agents. And regarding the output of the relevancy agent, only the propery name is the most relevant, the building name and the unit one can be nullable because some docs dont have those as info and only belong to the property
+
+---
+
+the most important thing for the relevancy agent is just to have the content of the file that was uploaded while calling the endpoints and make sense out of it, find the property it refers to, building and unit if provided and the actual content what it is about base on the schema of the markdown we have
+
+---
+
+some documents refer to the property owner, how do we add that to the application so that we can link the relevancy agent to look at the propery owners and check which property we are dealing with?
+
+---
+
+is it really efficient to provide the whole property markdown file to the first agent, wouldnt it be more efficient to just provide some ownwer data
+
+---
+
+I get this error when I upload a document that has only the property owner: 2026-04-25 23:14:53,148 - worker - ERROR - ✗ Error processing 1fd220c4-7beb-4bc1-bdef-02ba8533ada5: Expecting property name enclosed in double quotes: line 1 column 2 (char 1)
+
+---
+
+I was thinking of more of storing owners in the db itself and the agent can use a tool to check which property the owners have once the agent notices that the doc content is about the owner
+
+---
+
+no need for an endpoint  for the owners, just for the agent to use it as tool
+
+---
+
+for the one property we have add this to the owner database, but in english: "verwalter": "Huber & Partner Immobilienverwaltung GmbH",
+    "verwalter_strasse": "Friedrichstrasse 112",
+    "verwalter_plz": "10117",
+    "verwalter_ort": "Berlin",
+    "verwalter_email": "info@huber-partner-verwaltung.de",
+    "verwalter_telefon": "+49 30 12345-0",
+    "verwalter_iban": "DE89 3704 0044 0532 0130 00",
+    "verwalter_bic": "COBADEFFXXX",
+    "verwalter_bank": "Commerzbank Berlin",
+    "verwalter_steuernummer": "13/456/78901",
+
+---
+
+does the worker also calls the second agent, content agent after the first one is done? If not, fix it so that the second agent is aclled to make the updates into the markdown for the relevant section based on the document content.
