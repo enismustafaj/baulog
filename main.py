@@ -24,6 +24,8 @@ from worker import QueueWorker
 
 logger = logging.getLogger(__name__)
 _EML_UPLOAD_DIR = Path("data/uploads/eml")
+_AUDIO_UPLOAD_DIR = Path("data/uploads/audio")
+_AUDIO_EXTENSIONS = {".wav", ".mp3", ".m4a", ".ogg", ".flac", ".webm"}
 
 # Initialize the relevancy agent
 try:
@@ -132,6 +134,15 @@ async def _save_eml(filename: str, contents: bytes) -> tuple[str, Path]:
     upload_id = str(uuid.uuid4())
     _EML_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     stored_path = _EML_UPLOAD_DIR / f"{upload_id}_{filename}"
+    stored_path.write_bytes(contents)
+    return upload_id, stored_path
+
+
+async def _save_audio(filename: str, contents: bytes) -> tuple[str, Path]:
+    """Persist an audio file to disk for later transcription. Returns (upload_id, stored_path)."""
+    upload_id = str(uuid.uuid4())
+    _AUDIO_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    stored_path = _AUDIO_UPLOAD_DIR / f"{upload_id}_{filename}"
     stored_path.write_bytes(contents)
     return upload_id, stored_path
 
@@ -272,6 +283,42 @@ async def upload_eml(file: UploadFile = File(...)) -> UploadResponse:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing EML: {str(e)}")
+
+
+@app.post("/upload/audio", response_model=UploadResponse)
+async def upload_audio(file: UploadFile = File(...)) -> UploadResponse:
+    """Accept an audio file (call recording), save it, and enqueue it for transcription."""
+    original_filename = Path(file.filename or "").name
+    ext = Path(original_filename).suffix.lower()
+    if ext not in _AUDIO_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported audio format '{ext}'. Supported: {', '.join(sorted(_AUDIO_EXTENSIONS))}",
+        )
+
+    try:
+        contents = await file.read()
+        if not contents:
+            raise HTTPException(status_code=400, detail="Uploaded file is empty")
+
+        upload_id, stored_path = await _save_audio(original_filename, contents)
+
+        item_id = queue_manager.enqueue(
+            data={"filename": original_filename, "file_path": str(stored_path)},
+            source=DataSource.AUDIO,
+            metadata={"document_type": "audio", "filename": original_filename},
+        )
+
+        return UploadResponse(
+            status="enqueued",
+            message=f"{original_filename} saved and enqueued for transcription",
+            data_id=item_id,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error processing audio: {str(e)}")
 
 
 # ============================================================================

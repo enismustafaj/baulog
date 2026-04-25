@@ -29,6 +29,7 @@ class DataSource(str, Enum):
     PDF_INVOICE = "pdf_invoice"
     CSV = "csv"
     EML = "eml"
+    AUDIO = "audio"
 
 
 class QueueManager:

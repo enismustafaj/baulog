@@ -96,6 +96,9 @@ class QueueWorker:
             elif source == DataSource.EML.value:
                 return self.parse_eml_upload(payload)
 
+            elif source == DataSource.AUDIO.value:
+                return self.parse_audio_upload(payload)
+
             else:
                 logger.warning(f"Unknown source: {source}")
                 return json.dumps(payload)
@@ -111,6 +114,22 @@ class QueueWorker:
     def parse_csv_upload(self, payload: dict) -> str:
         """Return pre-extracted CSV row text from the queue payload."""
         return payload["text"]
+
+    def parse_audio_upload(self, payload: dict) -> str:
+        """Transcribe an uploaded audio file via Gradium STT and return the transcript."""
+        from agents.audio_transcriber import transcribe
+
+        file_path = Path(payload["file_path"])
+        if not file_path.exists():
+            raise FileNotFoundError(f"Audio file not found: {file_path}")
+
+        filename = payload.get("filename", file_path.name)
+        transcript = transcribe(file_path)
+        return "\n".join([
+            f"Audio Recording: {filename}",
+            "",
+            transcript,
+        ])
 
     def parse_eml_upload(self, payload: dict) -> str:
         """Parse an uploaded .eml file into plain text for the agent."""
