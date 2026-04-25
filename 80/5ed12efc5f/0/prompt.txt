@@ -1,0 +1,44 @@
+the relevancy agent should just analyze the content of the files that were uploaded and produce this structured output. 
+{
+	"property": "property_name",
+	"building": "building_name",
+	"unit": "unit_name",
+	"category": "category_name",
+	"action": "action_description"
+}
+
+---
+
+the context engine should only be based on a git repo and file system instead of the database, so all the property data should only be store in one markdown file which only represents on property and the markdown will have this structure 
+property
+	insurance
+	maintanance
+	buildings:
+		- haus1:
+			maintenance
+			 rent
+			 units:
+				- aprt1:
+					maintenance
+					 rent
+					 tenant
+
+adjust the markdown parser to parse the markdown in that format too
+
+---
+
+the insurance, maintenance, and the rent should be list of strings since new items could be added there when a new invoice that displays the rent is uploaded for example. Also, the structure of the markdown is like this, so adjust the parse look like this:
+
+# property
+
+## insurance
+## maintanance
+## buildings:
+### haus1
+#### maintenance
+#### rent
+#### units:
+##### aprt1
+###### maintenance
+###### rent
+###### tenant

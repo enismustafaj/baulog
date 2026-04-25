@@ -1,0 +1,38 @@
+{
+  "cli_version": "0.5.6",
+  "checkpoint_id": "805ed12efc5f",
+  "strategy": "manual-commit",
+  "branch": "main",
+  "checkpoints_count": 3,
+  "files_touched": [
+    "agents/relevancy_agent.py",
+    "context_engine/__init__.py",
+    "context_engine/engine.py",
+    "context_engine/markdown_parser.py",
+    "context_engine/models.py",
+    "main.py",
+    "pyproject.toml",
+    "queue_manager.py",
+    "uv.lock",
+    "webhooks/__init__.py",
+    "webhooks/email_handler.py",
+    "webhooks/erp_handler.py",
+    "webhooks/slack_handler.py",
+    "worker.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/80/5ed12efc5f/0/metadata.json",
+      "transcript": "/80/5ed12efc5f/0/full.jsonl",
+      "content_hash": "/80/5ed12efc5f/0/content_hash.txt",
+      "prompt": "/80/5ed12efc5f/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 171897,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 1431552,
+    "output_tokens": 16984,
+    "api_call_count": 42
+  }
+}
