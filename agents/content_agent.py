@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate
 
-from agents.config import GEMINI_MODEL
+from agents.config import GEMINI_MODEL, PROPERTIES_DIR
 from context_engine.engine import ContextEngine
 from context_engine.markdown_parser import MarkdownParser
 from context_engine.models import MarkdownSection
@@ -23,11 +23,7 @@ load_dotenv()
 class ContentAgent:
     """Agent that adjusts a Markdown property-file section based on an action."""
 
-    def __init__(
-        self,
-        api_key: str | None = None,
-        repo_path: str | Path = ".",
-    ):
+    def __init__(self, api_key: str | None = None):
         if api_key is None:
             api_key = os.getenv("GOOGLE_API_KEY")
             if not api_key:
@@ -42,7 +38,7 @@ class ContentAgent:
             temperature=0.3,
         )
         self.parser = MarkdownParser()
-        self.engine = ContextEngine(repo_path=repo_path)
+        self.engine = ContextEngine(repo_path=PROPERTIES_DIR)
 
     # ------------------------------------------------------------------
     # Public API

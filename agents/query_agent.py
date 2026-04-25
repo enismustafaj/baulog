@@ -12,26 +12,23 @@ from dotenv import load_dotenv
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate
 
-from agents.config import GEMINI_MODEL
+from agents.config import GEMINI_MODEL, PROPERTIES_DIR
 from context_engine.engine import ContextEngine
 from context_engine.markdown_parser import MarkdownParser
 from context_engine.models import MarkdownSection
 
 load_dotenv()
 
-_TOP_K = 6       # maximum sections to include in context
-_MIN_SCORE = 1   # minimum term-hit score to consider a section relevant
-_MIN_TERM_LEN = 3  # ignore query words shorter than this (stop-word heuristic)
+_TOP_K = 8          # maximum sections forwarded to the LLM
+_MIN_SCORE = 1      # sections scoring below this are discarded
+_MIN_TERM_LEN = 3   # query words shorter than this are ignored (stop-word heuristic)
+_PATH_WEIGHT = 3    # heading-path hits count this many times more than body hits
 
 
 class QueryAgent:
     """Answers user prompts about managed properties using RAG."""
 
-    def __init__(
-        self,
-        api_key: str | None = None,
-        repo_path: str | Path = ".",
-    ):
+    def __init__(self, api_key: str | None = None):
         if api_key is None:
             api_key = os.getenv("GOOGLE_API_KEY")
             if not api_key:
@@ -46,7 +43,7 @@ class QueryAgent:
             temperature=0,
         )
         self.parser = MarkdownParser()
-        self.engine = ContextEngine(repo_path=repo_path)
+        self.engine = ContextEngine(repo_path=PROPERTIES_DIR)
 
     # ------------------------------------------------------------------
     # Public API
@@ -67,9 +64,22 @@ class QueryAgent:
     # ------------------------------------------------------------------
 
     def _retrieve_context(self, query: str) -> tuple[str, list[str]]:
-        """Return (formatted_context, source_labels) for the top-K sections."""
+        """Parse every property file as a section tree, score each leaf section
+        against the query, and return the top-K most relevant sections in
+        document order.
+
+        Scoring weights heading-path hits (_PATH_WEIGHT × body hits) so that
+        structural matches (e.g. a section literally named 'maintenance' when
+        the user asks about maintenance) rank above incidental mentions in body
+        text.  Sections whose body is empty (pure structural headings) are
+        skipped entirely.
+        """
         terms = [t for t in query.lower().split() if len(t) >= _MIN_TERM_LEN]
-        scored: list[tuple[int, MarkdownSection, str]] = []
+        if not terms:
+            return "(Query is too short to search effectively.)", []
+
+        # (score, document_line, section, file_path)
+        candidates: list[tuple[int, int, MarkdownSection, Path]] = []
 
         for md_path in self.engine._iter_markdown_files():
             try:
@@ -78,26 +88,43 @@ class QueryAgent:
                 continue
 
             for section in sections:
-                content_lower = section.content.lower()
-                score = sum(content_lower.count(term) for term in terms)
+                body = self._body(section)
+                if not body:
+                    continue  # skip pure structural headings with no content
+
+                path_text = " ".join(section.path).lower()
+                path_score = sum(path_text.count(t) for t in terms) * _PATH_WEIGHT
+                body_score = sum(body.lower().count(t) for t in terms)
+                score = path_score + body_score
+
                 if score >= _MIN_SCORE:
-                    scored.append((score, section, str(md_path)))
+                    candidates.append((score, section.start_line, section, md_path))
 
-        scored.sort(key=lambda x: x[0], reverse=True)
-        top = scored[:_TOP_K]
-
-        if not top:
+        if not candidates:
             return "(No relevant property data found for this query.)", []
+
+        # Select best K by relevance score
+        candidates.sort(key=lambda x: x[0], reverse=True)
+        top = candidates[:_TOP_K]
+
+        # Re-sort into document order so the context reads coherently
+        top.sort(key=lambda x: (str(x[3]), x[1]))
 
         context_parts: list[str] = []
         sources: list[str] = []
 
-        for _, section, path in top:
+        for _, _, section, md_path in top:
             heading = " > ".join(section.path)
-            context_parts.append(f"[{heading}]\n{section.content}")
-            sources.append(f"{Path(path).name} — {heading}")
+            context_parts.append(f"[{heading}]\n{self._body(section)}")
+            sources.append(f"{md_path.name} — {heading}")
 
         return "\n\n---\n\n".join(context_parts), sources
+
+    def _body(self, section: MarkdownSection) -> str:
+        """Return section content with the heading line stripped."""
+        lines = section.content.splitlines()
+        body_lines = lines[1:] if lines and lines[0].startswith("#") else lines
+        return "\n".join(body_lines).strip()
 
     # ------------------------------------------------------------------
     # LLM call
