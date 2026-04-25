@@ -207,7 +207,9 @@ class MarkdownParser:
         for child in children:
             normalized_key = self._normalize_key(child.title)
 
-            if normalized_key == "insurance":
+            if normalized_key == "owner":
+                property_context.owner = self._section_items(child)
+            elif normalized_key == "insurance":
                 property_context.insurance = self._section_items(child)
             elif normalized_key in {"maintenance", "maintanance"}:
                 property_context.maintenance = self._section_items(child)

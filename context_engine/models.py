@@ -51,6 +51,7 @@ class PropertyContext:
     """Property context parsed from a single Markdown file."""
 
     name: str
+    owner: list[str] = field(default_factory=list)
     insurance: list[str] = field(default_factory=list)
     maintenance: list[str] = field(default_factory=list)
     buildings: list[PropertyBuildingContext] = field(default_factory=list)

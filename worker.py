@@ -38,14 +38,6 @@ class QueueWorker:
         initialize_agent: bool = True,
         agent=None,
     ):
-        """Initialize worker.
-
-        Args:
-            batch_size: Number of items to process per batch
-            poll_interval: Seconds to wait between polls
-            initialize_agent: Whether to initialize the relevancy agent
-            agent: Existing relevancy agent instance to reuse
-        """
         self.batch_size = batch_size
         self.poll_interval = poll_interval
         self.queue_manager = QueueManager()
@@ -57,14 +49,21 @@ class QueueWorker:
         elif initialize_agent:
             try:
                 from agents.relevancy_agent import RelevancyAgent
-
                 self.agent = RelevancyAgent()
                 logger.info("✓ Relevancy agent initialized")
             except ValueError as e:
-                logger.error(f"✗ Failed to initialize agent: {e}")
+                logger.error(f"✗ Failed to initialize relevancy agent: {e}")
                 self.agent = None
         else:
             self.agent = None
+
+        try:
+            from agents.content_agent import ContentAgent
+            self.content_agent = ContentAgent()
+            logger.info("✓ Content agent initialized")
+        except ValueError as e:
+            logger.error(f"✗ Failed to initialize content agent: {e}")
+            self.content_agent = None
 
         self.running = True
         self.stats = {
@@ -112,10 +111,12 @@ class QueueWorker:
         return payload["text"]
 
     def parse_eml_upload(self, payload: dict) -> str:
-        """Parse an uploaded .eml task into text for the agent."""
-        file_path = self._get_upload_path(payload)
-        message = BytesParser(policy=policy.default).parsebytes(file_path.read_bytes())
+        """Parse an uploaded .eml file into plain text for the agent."""
+        file_path = Path(payload["file_path"])
+        if not file_path.exists():
+            raise FileNotFoundError(f"EML file not found: {file_path}")
 
+        message = BytesParser(policy=policy.default).parsebytes(file_path.read_bytes())
         body = message.get_body(preferencelist=("plain", "html"))
         body_text = body.get_content() if body else ""
         attachments = [
@@ -124,7 +125,7 @@ class QueueWorker:
             if part.get_filename()
         ]
 
-        content = "\n".join(
+        return "\n".join(
             [
                 f"From: {message.get('from', 'Unknown')}",
                 f"To: {message.get('to', 'Unknown')}",
@@ -135,7 +136,40 @@ class QueueWorker:
                 body_text.strip(),
             ]
         )
-        return self._format_uploaded_document("EMAIL FILE", payload, content.strip())
+
+    def _apply_to_markdown(self, item_id: str, assessment: dict) -> None:
+        """Call the content agent to write the assessment back into the markdown file.
+
+        Failures here are logged but do not cause the queue item to be retried —
+        the relevancy assessment already succeeded and is stored in the DB.
+        """
+        if not self.content_agent:
+            logger.warning("Content agent not available — skipping markdown update for %s", item_id)
+            return
+
+        property_name = assessment.get("property") or ""
+        category = assessment.get("category") or ""
+
+        if not property_name or not category:
+            logger.warning(
+                "Skipping markdown update for %s — assessment missing property or category", item_id
+            )
+            return
+
+        try:
+            update = self.content_agent.adjust(assessment)
+            logger.info(
+                "Markdown updated for %s: section=%r  chars_before=%d  chars_after=%d",
+                item_id,
+                update.get("section_path"),
+                len(update.get("original_content") or ""),
+                len(update.get("adjusted_content") or ""),
+            )
+        except ValueError as e:
+            # Section not found in the markdown — assessment is still valid
+            logger.warning("Could not update markdown for %s: %s", item_id, e)
+        except Exception as e:
+            logger.error("Unexpected error updating markdown for %s: %s", item_id, e)
 
     def process_item(self, item: dict) -> bool:
         """Process a single queue item.
@@ -164,13 +198,31 @@ class QueueWorker:
             text_to_evaluate = self.format_webhook_data(source, payload)
 
             logger.info(f"Processing {source} item: {item_id}")
+            logger.debug(
+                "Sending to relevancy agent [%s chars]:\n%s",
+                len(text_to_evaluate),
+                text_to_evaluate[:500] + (" ..." if len(text_to_evaluate) > 500 else ""),
+            )
 
-            # Run agent evaluation
+            # Step 1 — relevancy agent: classify the document
             result = self.agent.evaluate(text_to_evaluate)
-            assessment = json.dumps(result["assessment"])
+            assessment = result["assessment"]
+
+            logger.info(
+                "Relevancy assessment for %s: property=%r  building=%r  unit=%r  category=%r  action=%r",
+                item_id,
+                assessment.get("property"),
+                assessment.get("building"),
+                assessment.get("unit"),
+                assessment.get("category"),
+                assessment.get("action"),
+            )
+
+            # Step 2 — content agent: apply the assessment to the markdown file
+            self._apply_to_markdown(item_id, assessment)
 
             # Mark as completed
-            self.queue_manager.mark_completed(item_id, assessment)
+            self.queue_manager.mark_completed(item_id, json.dumps(assessment))
 
             logger.info(f"✓ Completed: {item_id}")
             self.stats["completed"] += 1

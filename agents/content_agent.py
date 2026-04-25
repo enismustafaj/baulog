@@ -60,11 +60,11 @@ class ContentAgent:
         Returns:
             Dict with updated, section_path, original_content, adjusted_content.
         """
-        property_name = relevancy_output.get("property", "")
-        building_name = relevancy_output.get("building", "")
-        unit_name = relevancy_output.get("unit", "")
-        category = relevancy_output.get("category", "")
-        action = relevancy_output.get("action", "")
+        property_name = relevancy_output.get("property") or ""
+        building_name = relevancy_output.get("building") or ""
+        unit_name = relevancy_output.get("unit") or ""
+        category = relevancy_output.get("category") or ""
+        action = relevancy_output.get("action") or ""
 
         path = self._resolve_markdown_path(markdown_path, property_name)
 
