@@ -1,20 +1,31 @@
 """Relevancy Agent using LangChain and Google Gemini.
 
-This agent evaluates unstructured data (emails, PDFs, ERP data, etc.)
-and determines whether the data is relevant based on business criteria.
+This agent analyzes uploaded file content and extracts structured routing data.
 """
 
+import json
 import os
 from typing import Any
 from dotenv import load_dotenv
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate
+from pydantic import BaseModel, Field
 
 load_dotenv()
 
 
+class RelevancyOutput(BaseModel):
+    """Structured output extracted from uploaded file content."""
+
+    property: str = Field(default="")
+    building: str = Field(default="")
+    unit: str = Field(default="")
+    category: str = Field(default="")
+    action: str = Field(default="")
+
+
 class RelevancyAgent:
-    """Agent for evaluating data relevancy using Gemini."""
+    """Agent for extracting structured routing data from uploaded content."""
 
     def __init__(self, api_key: str | None = None):
         """Initialize the relevancy agent.
@@ -33,67 +44,62 @@ class RelevancyAgent:
         self.llm = ChatGoogleGenerativeAI(
             model="gemini-1.5-flash",
             google_api_key=api_key,
-            temperature=0.3,  # Lower temperature for more consistent relevancy decisions
+            temperature=0,
         )
 
-    def _check_business_relevance(self, data: str) -> str:
-        """Check if data is relevant to business operations.
+    def _parse_structured_output(self, content: str) -> RelevancyOutput:
+        """Parse and validate the model response as the required JSON object."""
+        text = content.strip()
+        if text.startswith("```"):
+            text = text.removeprefix("```json").removeprefix("```").strip()
+            text = text.removesuffix("```").strip()
 
-        Args:
-            data: The unstructured data to evaluate.
+        try:
+            payload = json.loads(text)
+        except json.JSONDecodeError:
+            start = text.find("{")
+            end = text.rfind("}")
+            if start == -1 or end == -1 or end <= start:
+                raise
+            payload = json.loads(text[start : end + 1])
 
-        Returns:
-            Relevancy assessment.
-        """
-        relevance_prompt = ChatPromptTemplate.from_messages(
-            [
-                (
-                    "system",
-                    "You are a business analyst. Evaluate if the provided data is relevant to business operations. "
-                    "Consider: business transactions, customer interactions, financial data, operational updates. "
-                    "Respond with RELEVANT or NOT_RELEVANT followed by a brief explanation.",
-                ),
-                ("human", "Data to evaluate:\n{data}"),
-            ]
-        )
-
-        chain = relevance_prompt | self.llm
-        result = chain.invoke({"data": data})
-        return result.content
+        return RelevancyOutput.model_validate(payload)
 
     def evaluate(self, data: str) -> dict[str, Any]:
-        """Evaluate the relevancy of provided data.
+        """Extract structured routing data from uploaded file content.
 
         Args:
-            data: Unstructured data to evaluate (email content, PDF text, ERP data, etc.)
+            data: Text extracted from an uploaded file.
 
         Returns:
-            Dictionary containing assessment and details.
+            Dictionary containing the structured extraction and raw model response.
         """
         prompt = ChatPromptTemplate.from_messages(
             [
                 (
                     "system",
-                    "You are a data relevancy assessment agent. Evaluate unstructured data "
-                    "such as emails, PDF documents, ERP records, and messages. "
-                    "Determine whether the data is relevant to business operations.",
+                    "You analyze only the content extracted from uploaded files. "
+                    "Do not use filenames, upload metadata, or outside knowledge. "
+                    "Extract the best matching property, building, unit, category, and action. "
+                    "If a value is not present in the uploaded content, use an empty string. "
+                    "Return only one valid JSON object with exactly these keys: "
+                    "property, building, unit, category, action.",
                 ),
                 (
                     "human",
-                    "Evaluate this unstructured data for business relevancy:\n\n{data}\n\n"
-                    "Provide a structured assessment with:\n"
-                    "1. Relevancy decision (RELEVANT or NOT_RELEVANT)\n"
-                    "2. Confidence level (HIGH, MEDIUM, LOW)\n"
-                    "3. Key entities found\n"
-                    "4. Business impact if relevant\n"
-                    "5. Reasoning",
+                    "Uploaded file content:\n\n{data}\n\n"
+                    "Required output shape:\n"
+                    '{{"property":"property_name","building":"building_name",'
+                    '"unit":"unit_name","category":"category_name",'
+                    '"action":"action_description"}}',
                 ),
             ]
         )
 
         chain = prompt | self.llm
         result = chain.invoke({"data": data})
+        structured_output = self._parse_structured_output(str(result.content))
         return {
-            "assessment": result.content,
+            "assessment": structured_output.model_dump(),
             "raw_response": result,
         }

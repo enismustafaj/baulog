@@ -9,15 +9,15 @@ Usage:
 
 import json
 import argparse
+from email import policy
+from email.parser import BytesParser
 import logging
 import signal
 import time
 import threading
+from pathlib import Path
 
 from queue_manager import QueueManager, DataSource
-from webhooks.email_handler import EmailWebhookHandler
-from webhooks.slack_handler import SlackWebhookHandler
-from webhooks.erp_handler import ERPWebhookHandler
 
 
 # Configure logging
@@ -86,23 +86,14 @@ class QueueWorker:
             Formatted text for agent
         """
         try:
-            if source == DataSource.EMAIL.value:
-                from webhooks.email_handler import EmailData
+            if source == DataSource.PDF_INVOICE.value:
+                return self.parse_pdf_invoice_upload(payload)
 
-                email_data = EmailData(**payload)
-                return EmailWebhookHandler.parse_email_data(email_data)
+            elif source == DataSource.CSV.value:
+                return self.parse_csv_upload(payload)
 
-            elif source == DataSource.SLACK.value:
-                from webhooks.slack_handler import SlackEvent
-
-                slack_event = SlackEvent(**payload)
-                return SlackWebhookHandler.parse_slack_message(slack_event)
-
-            elif source == DataSource.ERP.value:
-                from webhooks.erp_handler import ERPRecord
-
-                erp_data = ERPRecord(**payload)
-                return ERPWebhookHandler.parse_erp_data(erp_data)
+            elif source == DataSource.EML.value:
+                return self.parse_eml_upload(payload)
 
             else:
                 logger.warning(f"Unknown source: {source}")
@@ -111,6 +102,40 @@ class QueueWorker:
         except Exception as e:
             logger.error(f"Error formatting webhook data: {e}")
             return json.dumps(payload)
+
+    def parse_pdf_invoice_upload(self, payload: dict) -> str:
+        """Return pre-extracted PDF text from the queue payload."""
+        return payload["text"]
+
+    def parse_csv_upload(self, payload: dict) -> str:
+        """Return pre-extracted CSV row text from the queue payload."""
+        return payload["text"]
+
+    def parse_eml_upload(self, payload: dict) -> str:
+        """Parse an uploaded .eml task into text for the agent."""
+        file_path = self._get_upload_path(payload)
+        message = BytesParser(policy=policy.default).parsebytes(file_path.read_bytes())
+
+        body = message.get_body(preferencelist=("plain", "html"))
+        body_text = body.get_content() if body else ""
+        attachments = [
+            part.get_filename()
+            for part in message.iter_attachments()
+            if part.get_filename()
+        ]
+
+        content = "\n".join(
+            [
+                f"From: {message.get('from', 'Unknown')}",
+                f"To: {message.get('to', 'Unknown')}",
+                f"Subject: {message.get('subject', '')}",
+                f"Date: {message.get('date', '')}",
+                f"Attachments: {', '.join(attachments) if attachments else 'None'}",
+                "",
+                body_text.strip(),
+            ]
+        )
+        return self._format_uploaded_document("EMAIL FILE", payload, content.strip())
 
     def process_item(self, item: dict) -> bool:
         """Process a single queue item.
@@ -142,7 +167,7 @@ class QueueWorker:
 
             # Run agent evaluation
             result = self.agent.evaluate(text_to_evaluate)
-            assessment = result["assessment"]
+            assessment = json.dumps(result["assessment"])
 
             # Mark as completed
             self.queue_manager.mark_completed(item_id, assessment)

@@ -26,9 +26,9 @@ class DataStatus(str, Enum):
 class DataSource(str, Enum):
     """Source of webhook data."""
 
-    EMAIL = "email"
-    SLACK = "slack"
-    ERP = "erp"
+    PDF_INVOICE = "pdf_invoice"
+    CSV = "csv"
+    EML = "eml"
 
 
 class QueueManager:

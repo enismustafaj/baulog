@@ -1,21 +1,24 @@
+import csv
 import logging
 import os
 import threading
+import uuid
 from contextlib import asynccontextmanager
+from io import BytesIO, StringIO
+from pathlib import Path
 from typing import AsyncIterator
 
 import uvicorn
-from fastapi import FastAPI, HTTPException, Header
+from fastapi import FastAPI, File, HTTPException, Header, UploadFile
 from pydantic import BaseModel
 from datetime import datetime
+from pypdf import PdfReader
 from agents.relevancy_agent import RelevancyAgent
-from webhooks.email_handler import EmailWebhookHandler, EmailData
-from webhooks.slack_handler import SlackWebhookHandler, SlackEvent
-from webhooks.erp_handler import ERPWebhookHandler, ERPRecord
 from queue_manager import queue_manager, DataSource
 from worker import QueueWorker
 
 logger = logging.getLogger(__name__)
+UPLOAD_DIR = Path(os.getenv("BAULOG_UPLOAD_DIR", "data/uploads"))
 
 # Initialize the relevancy agent (optional - not needed for webhooks)
 try:
@@ -112,6 +115,36 @@ class WebhookResponse(BaseModel):
         super().__init__(**data)
 
 
+class CsvWebhookResponse(BaseModel):
+    """Response model for CSV webhook enqueue (one entry per row)."""
+
+    status: str
+    message: str
+    row_count: int
+    data_ids: list[str]
+    enqueued_at: datetime = None
+
+    def __init__(self, **data):
+        if "enqueued_at" not in data or data["enqueued_at"] is None:
+            data["enqueued_at"] = datetime.now()
+        super().__init__(**data)
+
+
+async def _save_upload(file: UploadFile, source: DataSource) -> tuple[str, Path, bytes]:
+    """Read, validate, and persist an uploaded file. Returns (upload_id, stored_path, contents)."""
+    original_filename = Path(file.filename or "").name
+    contents = await file.read()
+    if not contents:
+        raise HTTPException(status_code=400, detail="Uploaded file is empty")
+
+    upload_id = str(uuid.uuid4())
+    upload_dir = UPLOAD_DIR / source.value
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    stored_path = upload_dir / f"{upload_id}_{original_filename}"
+    stored_path.write_bytes(contents)
+    return upload_id, stored_path, contents
+
+
 @app.get("/")
 def read_root():
     """Root endpoint"""
@@ -137,178 +170,159 @@ def health_check():
     }
 
 
-@app.post("/evaluate", response_model=RelevancyResponse)
-def evaluate_data(input_data: DataInput) -> RelevancyResponse:
-    """Evaluate the relevancy of unstructured data using the relevancy agent.
+@app.post("/webhooks/invoices/pdf", response_model=WebhookResponse)
+async def invoice_pdf_webhook(
+    file: UploadFile = File(...),
+    x_signature: str | None = Header(None),
+    x_secret: str | None = Header(None),
+) -> WebhookResponse:
+    """Webhook endpoint for receiving invoice PDF uploads.
 
-    Args:
-        input_data: The data to evaluate (email, PDF content, ERP data, etc.)
-
-    Returns:
-        RelevancyResponse with assessment and confidence level
-
-    Raises:
-        HTTPException: If agent is not initialized or evaluation fails
+    Extracts text from the PDF at upload time and enqueues the plain text
+    so the worker can pass it directly to the relevancy agent.
     """
-    if not relevancy_agent:
-        raise HTTPException(
-            status_code=503,
-            detail="Relevancy agent is not initialized. "
-            "Please set GOOGLE_API_KEY environment variable.",
-        )
+    original_filename = Path(file.filename or "").name
+    if not original_filename.lower().endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="Invalid file type. Expected: .pdf")
 
     try:
-        result = relevancy_agent.evaluate(input_data.data)
-        assessment_text = result["assessment"].lower()
+        upload_id, stored_path, contents = await _save_upload(file, DataSource.PDF_INVOICE)
 
-        # Parse the assessment to determine relevancy
-        relevant = "relevant" in assessment_text and "not relevant" not in assessment_text
+        reader = PdfReader(BytesIO(contents))
+        page_texts = []
+        for page_num, page in enumerate(reader.pages, start=1):
+            text = page.extract_text() or ""
+            page_texts.append(f"--- Page {page_num} ---\n{text.strip()}")
+        extracted_text = "\n\n".join(page_texts).strip() or "[No extractable PDF text found]"
 
-        return RelevancyResponse(
-            relevant=relevant,
-            assessment=result["assessment"],
-            confidence="HIGH" if "high" in assessment_text else "MEDIUM",
+        item_id = queue_manager.enqueue(
+            data={
+                "text": extracted_text,
+                "filename": original_filename,
+                "upload_id": upload_id,
+                "file_path": str(stored_path),
+            },
+            source=DataSource.PDF_INVOICE,
+            metadata={"document_type": "invoice", "filename": original_filename},
         )
+
+        return WebhookResponse(
+            status="enqueued",
+            message=f"Invoice PDF {original_filename} text extracted and enqueued",
+            data_id=item_id,
+        )
+
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Error evaluating data: {str(e)}",
+            detail=f"Error processing invoice PDF: {str(e)}",
+        )
+
+
+@app.post("/webhooks/csv", response_model=CsvWebhookResponse)
+async def csv_webhook(
+    file: UploadFile = File(...),
+    x_signature: str | None = Header(None),
+    x_secret: str | None = Header(None),
+) -> CsvWebhookResponse:
+    """Webhook endpoint for receiving CSV file uploads.
+
+    Each data row is parsed at upload time and enqueued as a separate queue
+    item so the worker processes rows independently via the relevancy agent.
+    """
+    original_filename = Path(file.filename or "").name
+    if not original_filename.lower().endswith(".csv"):
+        raise HTTPException(status_code=400, detail="Invalid file type. Expected: .csv")
+
+    try:
+        upload_id, stored_path, contents = await _save_upload(file, DataSource.CSV)
+
+        raw_text = contents.decode("utf-8-sig")
+        reader = csv.DictReader(StringIO(raw_text))
+
+        if not reader.fieldnames:
+            raise HTTPException(status_code=400, detail="CSV file has no header row")
+
+        data_ids: list[str] = []
+        for row_number, row in enumerate(reader, start=1):
+            row_text = ", ".join(f"{k}: {v}" for k, v in row.items())
+            item_id = queue_manager.enqueue(
+                data={
+                    "text": row_text,
+                    "row_number": row_number,
+                    "filename": original_filename,
+                    "upload_id": upload_id,
+                    "file_path": str(stored_path),
+                },
+                source=DataSource.CSV,
+                metadata={
+                    "document_type": "csv",
+                    "filename": original_filename,
+                    "row_number": row_number,
+                },
+            )
+            data_ids.append(item_id)
+
+        if not data_ids:
+            raise HTTPException(status_code=400, detail="CSV file has no data rows")
+
+        return CsvWebhookResponse(
+            status="enqueued",
+            message=f"CSV file {original_filename} parsed and {len(data_ids)} rows enqueued",
+            row_count=len(data_ids),
+            data_ids=data_ids,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error processing CSV file: {str(e)}",
         )
 
 
 @app.post("/webhooks/email", response_model=WebhookResponse)
-def email_webhook(
-    payload: EmailData,
+async def email_webhook(
+    file: UploadFile = File(...),
     x_signature: str | None = Header(None),
     x_secret: str | None = Header(None),
 ) -> WebhookResponse:
-    """Webhook endpoint for receiving email data.
+    """Webhook endpoint for receiving .eml email uploads."""
+    original_filename = Path(file.filename or "").name
+    if not original_filename.lower().endswith(".eml"):
+        raise HTTPException(status_code=400, detail="Invalid file type. Expected: .eml")
 
-    Data is enqueued for asynchronous processing by the worker.
-
-    Args:
-        payload: Email webhook payload
-        x_signature: Optional webhook signature for validation
-        x_secret: Optional secret key for signature validation
-
-    Returns:
-        WebhookResponse with enqueue confirmation
-    """
     try:
-        # Convert payload to dict
-        data = payload.model_dump()
-
-        # Enqueue data for processing
-        item_id = queue_manager.enqueue(
-            data=data,
-            source=DataSource.EMAIL,
-            metadata={"sender": payload.sender, "subject": payload.subject},
-        )
-
-        return WebhookResponse(
-            status="enqueued",
-            message=f"Email from {payload.sender} enqueued for processing",
-            data_id=item_id,
-        )
-
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error enqueueing email: {str(e)}",
-        )
-
-
-@app.post("/webhooks/slack", response_model=WebhookResponse | dict)
-def slack_webhook(
-    payload: dict,
-    x_slack_request_timestamp: str | None = Header(None),
-    x_slack_signature: str | None = Header(None),
-) -> WebhookResponse | dict:
-    """Webhook endpoint for receiving Slack messages and events.
-
-    Data is enqueued for asynchronous processing by the worker.
-    Handles URL verification challenges immediately.
-
-    Args:
-        payload: Slack webhook payload
-        x_slack_request_timestamp: Slack request timestamp
-        x_slack_signature: Slack request signature
-
-    Returns:
-        WebhookResponse with enqueue confirmation, or challenge response for URL verification
-    """
-    try:
-        # Handle URL verification challenge (must respond immediately)
-        if payload.get("type") == "url_verification":
-            return {"challenge": payload.get("challenge")}
-
-        # Enqueue the event for processing
-        event_id = payload.get("event_id") or f"slack_{int(datetime.now().timestamp())}"
-        event = payload.get("event", {})
-        user = event.get("user", "unknown")
+        upload_id, stored_path, contents = await _save_upload(file, DataSource.EML)
 
         item_id = queue_manager.enqueue(
-            data=payload,
-            source=DataSource.SLACK,
-            metadata={"user": user, "channel": event.get("channel")},
-        )
-
-        return WebhookResponse(
-            status="enqueued",
-            message=f"Slack message from {user} enqueued for processing",
-            data_id=item_id,
-        )
-
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error enqueueing Slack webhook: {str(e)}",
-        )
-
-
-@app.post("/webhooks/erp", response_model=WebhookResponse)
-def erp_webhook(
-    payload: ERPRecord,
-    x_signature: str | None = Header(None),
-    x_secret: str | None = Header(None),
-) -> WebhookResponse:
-    """Webhook endpoint for receiving ERP system data.
-
-    Data is enqueued for asynchronous processing by the worker.
-
-    Args:
-        payload: ERP webhook payload
-        x_signature: Optional webhook signature for validation
-        x_secret: Optional secret key for signature validation
-
-    Returns:
-        WebhookResponse with enqueue confirmation
-    """
-    try:
-        # Convert payload to dict
-        data = payload.model_dump()
-
-        # Enqueue data for processing
-        item_id = queue_manager.enqueue(
-            data=data,
-            source=DataSource.ERP,
-            metadata={
-                "record_type": payload.record_type,
-                "record_id": payload.record_id,
-                "system": payload.system,
+            data={
+                "upload_id": upload_id,
+                "filename": original_filename,
+                "file_path": str(stored_path),
+                "content_type": file.content_type,
+                "size_bytes": len(contents),
+                "uploaded_at": datetime.now().isoformat(),
             },
+            source=DataSource.EML,
+            metadata={"document_type": "email", "filename": original_filename},
         )
 
         return WebhookResponse(
             status="enqueued",
-            message=f"ERP {payload.record_type} (ID: {payload.record_id}) enqueued for processing",
+            message=f"Email file {original_filename} enqueued for processing",
             data_id=item_id,
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Error enqueueing ERP webhook: {str(e)}",
+            detail=f"Error enqueueing email file: {str(e)}",
         )
 
 
