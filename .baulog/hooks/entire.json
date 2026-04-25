@@ -1,0 +1,13 @@
+{
+  "hooks": {
+    "session-start": {
+      "description": "Fired when a baulog content-adjustment operation starts"
+    },
+    "stop": {
+      "description": "Fired when a baulog content-adjustment turn completes"
+    },
+    "session-end": {
+      "description": "Fired when a baulog session terminates"
+    }
+  }
+}
