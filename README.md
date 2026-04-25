@@ -1,447 +1,297 @@
 # Baulog
 
-AI-powered data relevancy assessment system using LangChain and Google Gemini. Evaluates unstructured data (emails, PDFs, ERP data) to determine business relevance.
+Property management document processing system. Accepts uploaded files (PDF, CSV, EML), classifies them against a Markdown-based property registry using LangChain and Google Gemini, updates the relevant section in the property file, and exposes a natural-language query interface over the registry.
 
-## Features
-
-- **FastAPI Server**: RESTful API for data evaluation
-- **LangChain Agent**: Intelligent agent using Google Gemini model
-- **Asynchronous Queue System**: Webhooks enqueue data, background worker processes asynchronously
-- **Webhook Support**: Email, Slack, and ERP webhooks for real-time data ingestion
-- **Persistent Queue**: SQLite-based queue with retry logic and result tracking
-- **Multi-format Support**: Evaluates emails, PDFs, ERP data, and other unstructured data
-- **Relevancy Assessment**: Determines if data is relevant to business operations
-- **Entity Extraction**: Extracts key entities from documents
-
-## How It Works
+## How it works
 
 ```
-Webhook Receives Data
-    ↓
-Data Enqueued (fast response)
-    ↓
-Worker Process (background)
-    ↓
-Agent Evaluation (LangChain + Gemini)
-    ↓
-Results Stored (query via API)
+File uploaded via API
+        ↓
+Text extracted & enqueued (immediate response)
+        ↓
+Worker picks up item
+        ↓
+RelevancyAgent — identifies property, building, unit, category
+  └─ calls lookup_property_by_owner tool if needed
+        ↓
+ContentAgent — updates the matching section in the Markdown file
+        ↓
+Assessment stored in DB, result queryable via API
 ```
 
-## Prerequisites
+The property registry lives as Markdown files on the filesystem. The `QueryAgent` performs RAG over those files to answer natural-language questions about any property.
 
-- Python 3.11+
-- Google API Key for Gemini access (get it from [ai.google.dev](https://ai.google.dev))
-- Optional: Email provider credentials, Slack app credentials, ERP system access
+---
 
-## Quick Start
+## Setup
 
-1. **Install dependencies:**
-   ```bash
-   pip install -e .
-   ```
+**Requirements:** Python 3.11+, [uv](https://docs.astral.sh/uv/)
 
-2. **Configure API key:**
-   ```bash
-   cp .env.example .env
-   # Edit .env and add your GOOGLE_API_KEY
-   ```
-
-3. **Start the API server:**
-   ```bash
-   python main.py
-   ```
-
-4. **Start the worker** (in another terminal):
-   ```bash
-   python worker.py
-   ```
-
-That's it! Webhooks will now enqueue data and the worker will process it asynchronously.
-
-- **`GET /`** - Welcome message
-- **`GET /health`** - Health check and agent status
-- **`POST /evaluate`** - Evaluate data for relevancy
-
-#### Webhook Endpoints
-
-- **`POST /webhooks/email`** - Receive and process email data
-- **`POST /webhooks/slack`** - Receive and process Slack messages
-- **`POST /webhooks/erp`** - Receive and process ERP records
-
-## API Usage
-
-### 1. Synchronous Evaluation
-
-For immediate evaluation without queueing:
-
-**Request:**
 ```bash
-curl -X POST "http://localhost:8000/evaluate" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "data": "From: customer@example.com\nSubject: Purchase Order\n\nWe need 50 units of Product A",
-    "data_type": "email"
-  }'
+# Install dependencies
+uv sync
+
+# Configure environment
+cp .env.example .env
+# Fill in GOOGLE_API_KEY in .env
+
+# Start the API server (worker starts automatically)
+uv run python main.py
 ```
 
-**Response:**
-```json
-{
-  "relevant": true,
-  "assessment": "RELEVANT - This is a business transaction (purchase order) with specific quantity and product requirements.",
-  "confidence": "HIGH"
-}
+---
+
+## Environment variables
+
+| Variable | Default | Description |
+|---|---|---|
+| `GOOGLE_API_KEY` | — | **Required.** Google Gemini API key |
+| `GEMINI_MODEL` | `gemini-2.5-flash-preview-05-20` | Gemini model used by all agents |
+| `BAULOG_PROPERTIES_DIR` | `data/properties` | Directory where property Markdown files are stored |
+| `BAULOG_RUN_WORKER` | `true` | Set to `false` to disable the background worker on startup |
+| `BAULOG_WORKER_BATCH_SIZE` | `10` | Queue items processed per worker batch |
+| `BAULOG_WORKER_POLL_INTERVAL` | `5` | Seconds between worker queue polls |
+
+---
+
+## Property Markdown schema
+
+Properties are stored as Markdown files in `BAULOG_PROPERTIES_DIR`. Each file follows this heading hierarchy:
+
+```markdown
+# Property Name
+
+## owner
+- Owner or management company name
+
+## insurance
+- Policy details
+
+## maintanance
+- Property-level maintenance notes
+
+## buildings
+
+### building 12
+#### maintenance
+#### rent
+
+### building 16
+#### maintenance
+#### rent
+
+#### units
+
+##### unit WE 01
+###### maintenance
+###### rent
+###### tenant
+
+##### unit WE 02
+...
 ```
 
-### 2. Async Webhook: Email
+Section content is a list of `- item` bullet points. Empty sections are valid placeholders.
 
-Webhooks enqueue data for asynchronous processing. No waiting for agent evaluation.
+---
 
-**Request:**
-```bash
-curl -X POST "http://localhost:8000/webhooks/email" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "sender": "customer@example.com",
-    "recipients": ["sales@yourcompany.com"],
-    "subject": "Purchase Order Request",
-    "body": "We would like to order 100 units of Product X at $50 per unit. Please confirm availability.",
-    "message_id": "msg_12345",
-    "timestamp": "2024-04-25T10:30:00Z"
-  }'
+## Owner database
+
+Owners are stored in SQLite (`data/baulog_queue.db`) and used by the RelevancyAgent to match documents that reference a management company rather than the property name directly.
+
+```python
+from owner_repository import OwnerRepository
+
+repo = OwnerRepository()
+repo.add(
+    name="Huber & Partner Immobilienverwaltung GmbH",
+    property_name="WEG Immanuelkirchstraße 26",
+    street="Friedrichstrasse 112",
+    postal_code="10117",
+    city="Berlin",
+    email="info@huber-partner-verwaltung.de",
+    phone="+49 30 12345-0",
+    iban="DE89 3704 0044 0532 0130 00",
+    bic="COBADEFFXXX",
+    bank="Commerzbank Berlin",
+    tax_number="13/456/78901",
+)
 ```
 
-**Response (immediate - data enqueued):**
+The agent searches by name, email address, or IBAN, so any of those identifiers appearing in a document will resolve to the correct property.
+
+---
+
+## API endpoints
+
+### File upload
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/upload/pdf` | Upload a PDF — text extracted in-memory, enqueued |
+| `POST` | `/upload/csv` | Upload a CSV — each data row enqueued as a separate item |
+| `POST` | `/upload/eml` | Upload an `.eml` email file |
+
+All upload endpoints accept `multipart/form-data` with a single `file` field. No extra headers required.
+
+**PDF / EML response:**
 ```json
 {
   "status": "enqueued",
-  "message": "Email from customer@example.com enqueued for processing",
-  "data_id": "550e8400-e29b-41d4-a716-446655440000",
-  "enqueued_at": "2024-04-25T10:30:00Z"
+  "message": "invoice.pdf text extracted and enqueued",
+  "data_id": "550e8400-...",
+  "enqueued_at": "2026-01-01T10:00:00"
 }
 ```
 
-**Get results later:**
-```bash
-curl http://localhost:8000/queue/item/550e8400-e29b-41d4-a716-446655440000
+**CSV response** (one entry per row):
+```json
+{
+  "status": "enqueued",
+  "message": "data.csv parsed and 42 rows enqueued",
+  "row_count": 42,
+  "data_ids": ["abc-123", "def-456", "..."],
+  "enqueued_at": "2026-01-01T10:00:00"
+}
+```
+
+---
+
+### Queue management
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/queue/status` | Counts by status (pending / processing / completed / failed) |
+| `GET` | `/queue/item/{id}` | Details and assessment for a single item |
+| `GET` | `/queue/completed?limit=100&hours=24` | Recently completed items |
+
+---
+
+### Query (RAG)
+
+```
+POST /query
+Content-Type: application/json
+
+{ "prompt": "What is the maintenance schedule for building 16?" }
 ```
 
 Response:
 ```json
 {
-  "id": "550e8400-e29b-41d4-a716-446655440000",
-  "source": "email",
-  "status": "completed",
-  "created_at": "2024-04-25T10:30:00Z",
-  "assessment": "RELEVANT - This is a purchase order with specific product and pricing information."
+  "answer": "The maintenance schedule for building 16 includes...",
+  "sources": ["weg-immanuelkirchstrasse-26.md — WEG Immanuelkirchstraße 26 > buildings > building 16 > maintenance"]
 }
 ```
 
-### 3. Async Webhook: Slack
+The query agent parses all property files into heading-based sections, scores each section by relevance to the prompt (path matches weighted 3× over body matches), and feeds the top results to the LLM as grounded context.
 
-**Setup:**
-1. Create a Slack App at [api.slack.com](https://api.slack.com)
-2. Enable Event Subscriptions and set Request URL to `http://your-domain.com:8000/webhooks/slack`
-3. Subscribe to events: `message.channels`, `message.groups`, `message.im`
+---
 
-**Slack sends verification challenge (handled automatically):**
-```bash
-curl -X POST "http://localhost:8000/webhooks/slack" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "type": "url_verification",
-    "challenge": "3eZbrw1aBrm2K0Oo7YPvAq"
-  }'
+### Adjustment history
+
+```
+GET /adjustments?limit=50
 ```
 
-Response: `{"challenge": "3eZbrw1aBrm2K0Oo7YPvAq"}`
+Returns the most recent content-agent updates — which section was changed, the original and updated content, and the action that triggered the change.
 
-**Slack message event (enqueued for async processing):**
-```bash
-curl -X POST "http://localhost:8000/webhooks/slack" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "type": "event_callback",
-    "event": {
-      "type": "message",
-      "channel": "C123456",
-      "user": "U789012",
-      "text": "We need to expedite the shipment due to production delays",
-      "timestamp": "1234567890.123456"
-    },
-    "team_id": "T123456",
-    "api_app_id": "A123456",
-    "event_id": "Ev123456",
-    "event_time": 1234567890
-  }'
+---
+
+### Health check
+
+```
+GET /health
 ```
 
-Response (enqueued):
 ```json
 {
-  "status": "enqueued",
-  "message": "Slack message from U789012 enqueued for processing",
-  "data_id": "def-456...",
-  "enqueued_at": "2024-04-25T10:30:00Z"
+  "status": "healthy",
+  "agent_status": "ready",
+  "query_agent_status": "ready",
+  "worker_status": "running",
+  "worker_stats": { "processed": 10, "completed": 9, "failed": 1, "errors": 1, "skipped": 0 }
 }
 ```
 
-### 4. Async Webhook: ERP
+---
 
-**Setup:**
-Configure your ERP system (SAP, Oracle, NetSuite, etc.) to send notifications to `http://your-domain.com:8000/webhooks/erp`
+## Agents
 
-**Request - Purchase Order:**
-```bash
-curl -X POST "http://localhost:8000/webhooks/erp" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "record_type": "purchase_order",
-    "record_id": "PO-2024-001",
-    "system": "SAP",
-    "priority": "HIGH",
-    "timestamp": "2024-04-25T10:30:00Z",
-    "data": {
-      "vendor": "Supplier Inc.",
-      "total_amount": 15000,
-      "items": [
-        {
-          "material_id": "MAT-123",
-          "quantity": 100,
-          "unit_price": 150
-        }
-      ],
-      "delivery_date": "2024-05-10",
-      "status": "RELEASED"
-    }
-  }'
-```
+### RelevancyAgent
 
-**Response (enqueued immediately):**
+Reads uploaded document text and outputs:
+
 ```json
 {
-  "status": "enqueued",
-  "message": "ERP purchase_order (ID: PO-2024-001) enqueued for processing",
-  "data_id": "ghi-789...",
-  "enqueued_at": "2024-04-25T10:30:00Z"
+  "property": "WEG Immanuelkirchstraße 26",
+  "building": null,
+  "unit": "unit WE 49",
+  "category": "maintenance",
+  "action": "Invoice for janitorial services, garbage bin provision, and winter service."
 }
 ```
 
-**Get results:**
+- `property` — exact name from the Markdown registry (required)
+- `building` — null when the document is property-level
+- `unit` — null when not unit-specific
+- `category` — one of `insurance | maintenance | rent | tenant`
+- `action` — one or two sentence summary
+
+When the property name is not in the document, the agent calls the `lookup_property_by_owner` tool with every name, email, and IBAN it finds. The tool searches the owner database and returns the matching property name.
+
+### ContentAgent
+
+Takes the RelevancyAgent output, finds the matching section in the Markdown file (using substring path matching so `WE 49` matches heading `unit WE 49`), asks the LLM to update the content based on the action, and writes the result back to the file. Property-level documents prefer the shallowest matching section.
+
+### QueryAgent
+
+RAG pipeline over the property Markdown files:
+1. Parses all files into `MarkdownSection` objects with heading paths and line numbers
+2. Skips pure structural headings with no body
+3. Scores sections: path hits × 3 + body hits
+4. Takes top 8 by score, re-sorts into document order
+5. Passes formatted sections to Gemini with a system prompt that restricts the answer to the retrieved data
+
+---
+
+## Worker
+
+The background worker runs inside the same process as the API server (controlled by `BAULOG_RUN_WORKER`). It can also be run standalone:
+
 ```bash
-curl http://localhost:8000/queue/item/ghi-789...
+uv run python worker.py               # continuous polling
+uv run python worker.py --once        # process one batch then exit
+uv run python worker.py --stats       # print queue stats then exit
+uv run python worker.py --batch-size 20 --poll-interval 2
 ```
 
-## Queue Management API
+Items that fail are retried up to 3 times before being permanently marked as failed.
 
-Track and retrieve webhook results:
+---
 
-### Queue Status
-```bash
-curl http://localhost:8000/queue/status
-```
-
-Response:
-```json
-{
-  "pending": 5,
-  "processing": 1,
-  "completed": 42,
-  "failed": 0
-}
-```
-
-### Get Item Status & Assessment
-```bash
-curl http://localhost:8000/queue/item/{item_id}
-```
-
-### Recent Completed Items
-```bash
-curl http://localhost:8000/queue/completed?limit=10&hours=24
-```
-
-## Using the Agent Programmatically
-
-```python
-from agents.relevancy_agent import RelevancyAgent
-
-# Initialize agent
-agent = RelevancyAgent()
-
-# Evaluate data
-result = agent.evaluate("Your unstructured data here...")
-print(result["assessment"])
-```
-
-## Webhook Security
-
-All webhooks support signature verification:
-
-### Email Webhook Security
-```python
-from webhooks.email_handler import EmailWebhookHandler
-
-is_valid = EmailWebhookHandler.validate_webhook_signature(
-    signature="provided_signature",
-    payload="raw_payload",
-    secret="your_shared_secret"
-)
-```
-
-### Slack Webhook Security
-The Slack webhook automatically validates:
-- Request timestamp (must be within 5 minutes)
-- Request signature using Slack signing secret
-
-### ERP Webhook Security
-```python
-from webhooks.erp_handler import ERPWebhookHandler
-
-is_valid = ERPWebhookHandler.validate_webhook_signature(
-    signature="provided_signature",
-    payload="raw_payload",
-    secret="your_shared_secret"
-)
-```
-
-## Project Structure
+## Project structure
 
 ```
 baulog/
-├── main.py                      # FastAPI server with webhook & queue endpoints
-├── worker.py                    # Background worker for async processing
-├── queue_manager.py             # SQLite queue management
+├── main.py                  # FastAPI app, upload endpoints, query endpoint
+├── worker.py                # Background queue worker
+├── queue_manager.py         # SQLite queue (baulog_queue.db)
+├── owner_repository.py      # SQLite owner → property index
 ├── agents/
-│   ├── __init__.py
-│   └── relevancy_agent.py       # LangChain agent implementation
-├── webhooks/
-│   ├── __init__.py
-│   ├── email_handler.py         # Email webhook handler
-│   ├── slack_handler.py         # Slack webhook handler
-│   └── erp_handler.py           # ERP webhook handler
+│   ├── config.py            # Shared config (model, paths)
+│   ├── relevancy_agent.py   # Document classifier with owner tool
+│   ├── content_agent.py     # Markdown section updater
+│   └── query_agent.py       # RAG query agent
+├── context_engine/
+│   ├── engine.py            # ContextEngine — searches property files
+│   ├── markdown_parser.py   # Parses heading-based Markdown into sections
+│   └── models.py            # PropertyContext, BuildingContext, UnitContext
 ├── data/
-│   └── baulog_queue.db          # SQLite queue database (auto-created)
-├── ASYNC_QUEUE_GUIDE.md         # Detailed async processing guide
-├── WEBHOOK_GUIDE.md             # Webhook integration guide
-├── pyproject.toml               # Project dependencies
-├── .env.example                 # Environment variables template
-└── README.md                    # This file
+│   ├── properties/          # Property Markdown files (BAULOG_PROPERTIES_DIR)
+│   ├── uploads/eml/         # Saved EML files (worker reads these)
+│   ├── baulog_queue.db      # Queue + owner database
+│   └── adjustments.db       # Content-agent update history
+├── .env.example
+└── pyproject.toml
 ```
-
-## Running the System
-
-### 1. Start the API Server
-```bash
-python main.py
-```
-
-### 2. Start the Worker (in another terminal)
-```bash
-python worker.py
-```
-
-The worker will continuously poll the queue every 5 seconds and process items in batches of 10.
-
-## Configuration
-
-### Environment Variables
-
-Create a `.env` file with:
-```env
-GOOGLE_API_KEY=your_google_api_key_here
-EMAIL_WEBHOOK_SECRET=optional_email_secret
-SLACK_SIGNING_SECRET=optional_slack_secret
-ERP_WEBHOOK_SECRET=optional_erp_secret
-```
-
-### Agent Configuration
-
-Edit [agents/relevancy_agent.py](agents/relevancy_agent.py) to customize:
-- **Model**: Change from `gemini-1.5-flash` to `gemini-1.5-pro`
-- **Temperature**: Adjust from 0.3 (consistent) to higher values
-- **Tools**: Add custom tools for domain-specific evaluation
-
-## Dependencies
-
-- `fastapi[standard]` - Web framework
-- `langchain` - LLM orchestration framework
-- `langchain-google-genai` - Google Gemini integration
-- `google-generativeai` - Google Generative AI SDK
-- `python-dotenv` - Environment variable management
-- `email-validator` - Email validation
-
-## Testing Webhooks Locally
-
-Use ngrok for local testing with external webhooks:
-
-```bash
-# Install ngrok
-brew install ngrok
-
-# Start ngrok tunnel
-ngrok http 8000
-
-# Use the provided ngrok URL (e.g., https://abc123.ngrok.io)
-# to configure webhooks in Slack, email provider, or ERP system
-```
-
-## Asynchronous Processing Flow
-
-```
-Email/Slack/ERP Data 
-    ↓
-Webhook Endpoint (Fast Response)
-    ↓
-Data Enqueued to SQLite Queue
-    ↓
-Worker Process Picks Up Item
-    ↓
-Data Formatting & Validation
-    ↓
-Relevancy Agent (LangChain + Gemini)
-    ↓
-Assessment Stored in Queue
-    ↓
-Query Results via API (/queue/item/{id})
-```
-
-## Troubleshooting
-
-**Agent not initialized:**
-```
-Error: GOOGLE_API_KEY environment variable not set
-```
-Solution: Create `.env` file and set `GOOGLE_API_KEY`
-
-**Webhooks not being processed:**
-- Check if worker is running: `ps aux | grep worker.py`
-- Check queue status: `curl http://localhost:8000/queue/status`
-- Start worker: `python worker.py`
-
-**Items stuck in pending:**
-- Restart worker process
-- Check worker logs for errors
-- Verify agent is initialized
-
-**Slow processing:**
-- Run multiple worker instances: `python worker.py &` (run in background)
-- Adjust batch size: `python worker.py --items 20`
-- Reduce poll interval: `python worker.py --poll-interval 1`
-
-See [ASYNC_QUEUE_GUIDE.md](ASYNC_QUEUE_GUIDE.md) for detailed troubleshooting.
-
-## Production Deployment
-
-For production, use:
-- **Supervisor** or **systemd** for process management
-- **Docker** for containerization
-- **PostgreSQL** for queue storage (large scale)
-- **Gunicorn** with multiple workers for the API
-- **Multiple worker instances** for processing scale
-
-See [ASYNC_QUEUE_GUIDE.md](ASYNC_QUEUE_GUIDE.md) for deployment examples.
-
-## License
-
-MIT
