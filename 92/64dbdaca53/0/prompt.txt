@@ -1,0 +1,17 @@
+i need an api that will be used by the frontend which will accept a prompt from the user, do a rag search in the markdown property file and then ask a new agent which you should build to answer that prompt from the user.
+
+---
+
+adjust the pdf, csv and the eml endpoints to have nothing to do with the webhook but just accept an uploaded file of that type.
+
+---
+
+adjust the env file so that only include vars that are only used in the whole project and nothing else, also generate a env file for me
+
+---
+
+why do I need this BAULOG_UPLOAD_DIR. I am uploading from the endpoints. if not needed remove it
+
+---
+
+make the gemini model type a variable too. and set it to gemini-3-flash-preview
