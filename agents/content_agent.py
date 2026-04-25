@@ -4,7 +4,11 @@ Reads relevancy agent output, extracts the targeted section from the
 property Markdown file, asks the LLM to adjust it, and writes back.
 """
 
+import json
 import os
+import subprocess
+import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -42,6 +46,7 @@ class ContentAgent:
         )
         self.parser = MarkdownParser()
         self.engine = ContextEngine(repo_path=repo_path)
+        self._sessions_dir = Path(self.engine.repo_path) / ".baulog" / "entire-sessions"
 
     # ------------------------------------------------------------------
     # Public API
@@ -69,11 +74,18 @@ class ContentAgent:
         category = relevancy_output.get("category", "")
         action = relevancy_output.get("action", "")
 
+        session_id = str(uuid.uuid4())
+        self._sessions_dir.mkdir(parents=True, exist_ok=True)
+        session_ref = str(self._sessions_dir / f"{session_id}.jsonl")
+
+        self._fire_hook("session-start", session_id, session_ref, action)
+
         path = self._resolve_markdown_path(markdown_path, property_name)
 
         sections = self.parser.parse_file(path)
         target = self._find_section(sections, property_name, building_name, unit_name, category)
         if target is None:
+            self._fire_hook("session-end", session_id, session_ref, action)
             raise ValueError(
                 f"No section found for property={property_name!r}, "
                 f"building={building_name!r}, unit={unit_name!r}, "
@@ -84,13 +96,21 @@ class ContentAgent:
         adjusted_body = self._call_llm(original_body, action, category)
         self._write_back(path, target, adjusted_body)
 
-        return {
+        result = {
             "updated": True,
             "markdown_path": str(path),
             "section_path": " > ".join(target.path),
             "original_content": original_body,
             "adjusted_content": adjusted_body,
         }
+
+        # Append result to session transcript so the stop hook can read it
+        with open(session_ref, "a", encoding="utf-8") as fh:
+            fh.write(json.dumps(result) + "\n")
+
+        # Fire stop in background — checkpoint creation can take several seconds
+        self._fire_hook("stop", session_id, session_ref, action, background=True)
+        return result
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -213,3 +233,40 @@ class ContentAgent:
 
     def _normalize(self, value: str) -> str:
         return " ".join(str(value).casefold().strip().strip(":").split())
+
+    def _fire_hook(
+        self,
+        hook_name: str,
+        session_id: str,
+        session_ref: str,
+        prompt: str,
+        background: bool = False,
+    ) -> None:
+        payload = json.dumps({
+            "hook_type": hook_name,
+            "session_id": session_id,
+            "session_ref": session_ref,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "user_prompt": prompt,
+        }).encode()
+        # Augment PATH so `entire` is found even when invoked from restricted shells
+        env = os.environ.copy()
+        extra = os.path.expanduser("~/.local/bin")
+        if extra not in env.get("PATH", ""):
+            env["PATH"] = extra + ":" + env.get("PATH", "")
+        try:
+            proc = subprocess.Popen(
+                ["entire", "hooks", "baulog", hook_name],
+                stdin=subprocess.PIPE,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                env=env,
+            )
+            if background:
+                proc.stdin.write(payload)
+                proc.stdin.close()
+                # Entire creates the checkpoint; let it finish in the background
+            else:
+                proc.communicate(input=payload, timeout=30)
+        except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
+            pass
