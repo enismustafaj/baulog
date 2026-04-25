@@ -79,33 +79,19 @@ class QueueWorker:
     def format_webhook_data(self, source: str, payload: dict) -> str:
         """Convert webhook data to text for agent evaluation.
 
-        Args:
-            source: Data source (email, slack, erp)
-            payload: Raw webhook payload
-
-        Returns:
-            Formatted text for agent
+        Raises on parse failure so the caller can mark the item as failed
+        rather than forwarding raw JSON to the agent.
         """
-        try:
-            if source == DataSource.PDF_INVOICE.value:
-                return self.parse_pdf_invoice_upload(payload)
-
-            elif source == DataSource.CSV.value:
-                return self.parse_csv_upload(payload)
-
-            elif source == DataSource.EML.value:
-                return self.parse_eml_upload(payload)
-
-            elif source == DataSource.AUDIO.value:
-                return self.parse_audio_upload(payload)
-
-            else:
-                logger.warning(f"Unknown source: {source}")
-                return json.dumps(payload)
-
-        except Exception as e:
-            logger.error(f"Error formatting webhook data: {e}")
-            return json.dumps(payload)
+        if source == DataSource.PDF_INVOICE.value:
+            return self.parse_pdf_invoice_upload(payload)
+        elif source == DataSource.CSV.value:
+            return self.parse_csv_upload(payload)
+        elif source == DataSource.EML.value:
+            return self.parse_eml_upload(payload)
+        elif source == DataSource.AUDIO.value:
+            return self.parse_audio_upload(payload)
+        else:
+            raise ValueError(f"Unknown source type: {source!r}")
 
     def parse_pdf_invoice_upload(self, payload: dict) -> str:
         """Return pre-extracted PDF text from the queue payload."""
@@ -117,7 +103,7 @@ class QueueWorker:
 
     def parse_audio_upload(self, payload: dict) -> str:
         """Transcribe an uploaded audio file via Gradium STT and return the transcript."""
-        from agents.audio_transcriber import transcribe
+        from audio_transcriber import transcribe
 
         file_path = Path(payload["file_path"])
         if not file_path.exists():

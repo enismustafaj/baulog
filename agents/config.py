@@ -8,6 +8,7 @@ load_dotenv()
 PROJECT_ROOT: Path = Path(__file__).resolve().parent.parent
 
 GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-2.5-flash-preview-05-20")
+GRADIUM_API_KEY: str = os.getenv("GRADIUM_API_KEY", "")
 PROPERTIES_DIR: str = os.getenv(
     "BAULOG_PROPERTIES_DIR",
     str(PROJECT_ROOT / "data" / "properties"),

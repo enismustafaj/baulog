@@ -16,15 +16,15 @@ from fastapi import FastAPI, File, HTTPException, UploadFile
 from pydantic import BaseModel
 from datetime import datetime
 from pypdf import PdfReader
-from agents.config import ADJUSTMENTS_DB
+from agents.config import ADJUSTMENTS_DB, PROJECT_ROOT
 from agents.relevancy_agent import RelevancyAgent
 from agents.query_agent import QueryAgent
 from queue_manager import queue_manager, DataSource
 from worker import QueueWorker
 
 logger = logging.getLogger(__name__)
-_EML_UPLOAD_DIR = Path("data/uploads/eml")
-_AUDIO_UPLOAD_DIR = Path("data/uploads/audio")
+_EML_UPLOAD_DIR = PROJECT_ROOT / "data" / "uploads" / "eml"
+_AUDIO_UPLOAD_DIR = PROJECT_ROOT / "data" / "uploads" / "audio"
 _AUDIO_EXTENSIONS = {".wav", ".mp3", ".m4a", ".ogg", ".flac", ".webm"}
 
 # Initialize the relevancy agent

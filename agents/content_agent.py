@@ -186,9 +186,15 @@ class ContentAgent:
 
             if norm_category and path_norm[-1] != norm_category:
                 continue
-            if norm_unit and not any(norm_unit in p for p in path_norm):
+            if norm_unit and not any(
+                norm_unit in p or norm_unit.replace(" ", "") in p.replace(" ", "")
+                for p in path_norm
+            ):
                 continue
-            if norm_building and not any(norm_building in p for p in path_norm):
+            if norm_building and not any(
+                norm_building in p or norm_building.replace(" ", "") in p.replace(" ", "")
+                for p in path_norm
+            ):
                 continue
             if norm_property and (not path_norm or path_norm[0] != norm_property):
                 continue

@@ -121,7 +121,31 @@ class OwnerRepository:
     # ------------------------------------------------------------------
 
     def search(self, query: str) -> list[dict]:
-        """Search owners by name, email, or IBAN (case-insensitive substring)."""
+        """Search owners by name, email, or IBAN (case-insensitive substring).
+
+        First tries the full query string. If nothing is found it falls back to
+        word-by-word matching so that STT transcription variants (e.g. 'und'
+        instead of '&') still resolve correctly.
+        """
+        results = self._search_like(query)
+        if results:
+            return results
+
+        # Fallback: search each significant word individually and merge unique hits.
+        # Skip short tokens that add noise ('und', 'and', 'the', 'GmbH', 'AG' …).
+        _SKIP = {"und", "and", "or", "the", "gmbh", "ag", "kg", "e.v.", "mbh"}
+        words = [w for w in query.split() if len(w) > 3 and w.lower() not in _SKIP]
+        seen: set[str] = set()
+        merged: list[dict] = []
+        for word in words:
+            for row in self._search_like(word):
+                if row["id"] not in seen:
+                    seen.add(row["id"])
+                    merged.append(row)
+        return merged
+
+    def _search_like(self, query: str) -> list[dict]:
+        """Raw substring search across name, email, and IBAN."""
         like = f"%{query}%"
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
