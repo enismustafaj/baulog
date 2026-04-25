@@ -1,0 +1,35 @@
+implement another agent in the agents directory that reads the output of the relevancy agent in the format
+
+---
+
+implement another agent in the agents directory that reads the output of the relevancy agent in the format{
+    "property": "property_name",
+    "building": "building_name",
+    "unit": "unit_name",
+    "category": "category_name",
+    "action": "action_description"
+} but before calling the agent parse the markdown file, extract the components that are deined in the previous agent output and then feed that to the new agent with the action descirption and ask it to adjust the content. after the agent is done add the output back to the mardown file and save it.
+
+---
+
+implement another agent in the agents directory that reads the output of the relevancy agent in the format{
+    "property": "property_name",
+    "building": "building_name",
+    "unit": "unit_name",
+    "category": "category_name",
+    "action": "action_description"
+} but before calling the agent parse the markdown file, extract the components that are deined in the previous agent output and then feed that to the new agent with the action descirption and ask it to adjust the content. after the agent is done add the output back to the mardown file and save it.
+
+---
+
+implement another agent in the agents directory that reads the output of the relevancy agent in the format{
+    "property": "property_name",
+    "building": "building_name",
+    "unit": "unit_name",
+    "category": "category_name",
+    "action": "action_description"
+} but before calling the agent parse the markdown file, extract the components that are deined in the previous agent output and then feed that to the new agent with the action descirption and ask it to adjust the content. after the agent is done add the output back to the mardown file and save it.
+
+---
+
+for the pdf upload endpoint the text should be extracted and put in the queue so that the worker can pick it up and give to the relevancy agent. for the csv file. each row in the csv should be one entry in the queue.

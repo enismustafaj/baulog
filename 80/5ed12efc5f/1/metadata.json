@@ -1,0 +1,86 @@
+{
+  "cli_version": "0.5.6",
+  "checkpoint_id": "805ed12efc5f",
+  "session_id": "4b1935f2-997b-4117-aaed-e129ed1ceae6",
+  "strategy": "manual-commit",
+  "created_at": "2026-04-25T19:08:06.033662Z",
+  "branch": "main",
+  "checkpoints_count": 2,
+  "files_touched": [
+    "agents/__init__.py",
+    "agents/content_agent.py",
+    "agents/relevancy_agent.py",
+    "main.py",
+    "pyproject.toml",
+    "queue_manager.py",
+    "uv.lock",
+    "webhooks/__init__.py",
+    "webhooks/email_handler.py",
+    "webhooks/erp_handler.py",
+    "webhooks/slack_handler.py",
+    "worker.py"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-sonnet-4-6",
+  "turn_id": "ad48241242bf",
+  "token_usage": {
+    "input_tokens": 1219,
+    "cache_creation_tokens": 52915,
+    "cache_read_tokens": 1106602,
+    "output_tokens": 24174,
+    "api_call_count": 24
+  },
+  "session_metrics": {
+    "turn_count": 2
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-04-25T19:08:06.027793Z",
+    "agent_lines": 0,
+    "agent_removed": 0,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 499,
+    "total_committed": 220,
+    "total_lines_changed": 499,
+    "agent_percentage": 0,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 945,
+      "user_lines_removed": 499,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        "agents/relevancy_agent.py": 46,
+        "context_engine/__init__.py": 24,
+        "context_engine/engine.py": 203,
+        "context_engine/markdown_parser.py": 391,
+        "context_engine/models.py": 89,
+        "main.py": 89,
+        "pyproject.toml": 1,
+        "queue_manager.py": 3,
+        "uv.lock": 11,
+        "worker.py": 88
+      },
+      "user_removed_per_file": {
+        "agents/relevancy_agent.py": 40,
+        "main.py": 131,
+        "queue_manager.py": 3,
+        "webhooks/__init__.py": 7,
+        "webhooks/email_handler.py": 76,
+        "webhooks/erp_handler.py": 104,
+        "webhooks/slack_handler.py": 119,
+        "worker.py": 19
+      }
+    },
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 1162,
+      "agent_lines_removed": 500
+    }
+  ]
+}
