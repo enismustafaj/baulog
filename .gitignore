@@ -219,3 +219,6 @@ __marimo__/
 
 # Data files
 data/
+
+# Entire session checkpoints
+.baulog/entire-sessions/

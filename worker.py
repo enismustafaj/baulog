@@ -10,6 +10,8 @@ Usage:
 import json
 import argparse
 from email import policy
+from email.headerregistry import Address
+from email.utils import getaddresses
 from email.parser import BytesParser
 import logging
 import signal
@@ -125,17 +127,43 @@ class QueueWorker:
             if part.get_filename()
         ]
 
-        return "\n".join(
-            [
-                f"From: {message.get('from', 'Unknown')}",
-                f"To: {message.get('to', 'Unknown')}",
-                f"Subject: {message.get('subject', '')}",
-                f"Date: {message.get('date', '')}",
-                f"Attachments: {', '.join(attachments) if attachments else 'None'}",
-                "",
-                body_text.strip(),
-            ]
+        # Collect all display names and addresses from every participant header
+        participant_headers = ["from", "to", "cc", "bcc", "reply-to", "sender"]
+        raw_pairs = getaddresses(
+            [message.get(h, "") for h in participant_headers]
         )
+        # Build a deduplicated flat list: "Display Name <email@example.com>"
+        seen: set[str] = set()
+        participants: list[str] = []
+        for display_name, addr in raw_pairs:
+            if not addr:
+                continue
+            entry = f"{display_name} <{addr}>" if display_name else addr
+            if addr.lower() not in seen:
+                seen.add(addr.lower())
+                participants.append(entry)
+
+        lines = [
+            "=== EMAIL ===",
+            f"From: {message.get('from', 'Unknown')}",
+            f"To: {message.get('to', 'Unknown')}",
+        ]
+        if message.get("cc"):
+            lines.append(f"CC: {message.get('cc')}")
+        if message.get("reply-to"):
+            lines.append(f"Reply-To: {message.get('reply-to')}")
+        lines += [
+            f"Subject: {message.get('subject', '')}",
+            f"Date: {message.get('date', '')}",
+            f"Attachments: {', '.join(attachments) if attachments else 'None'}",
+            "",
+            "=== PARTICIPANTS (all addresses from all headers) ===",
+            "\n".join(f"- {p}" for p in participants),
+            "",
+            "=== BODY ===",
+            body_text.strip(),
+        ]
+        return "\n".join(lines)
 
     def _apply_to_markdown(self, item_id: str, assessment: dict) -> None:
         """Call the content agent to write the assessment back into the markdown file.
@@ -198,10 +226,10 @@ class QueueWorker:
             text_to_evaluate = self.format_webhook_data(source, payload)
 
             logger.info(f"Processing {source} item: {item_id}")
-            logger.debug(
+            logger.info(
                 "Sending to relevancy agent [%s chars]:\n%s",
                 len(text_to_evaluate),
-                text_to_evaluate[:500] + (" ..." if len(text_to_evaluate) > 500 else ""),
+                text_to_evaluate[:1000] + (" ..." if len(text_to_evaluate) > 1000 else ""),
             )
 
             # Step 1 — relevancy agent: classify the document
@@ -230,7 +258,17 @@ class QueueWorker:
             return True
 
         except Exception as e:
-            logger.error(f"✗ Error processing {item_id}: {e}")
+            retry_count = item.get("retry_count", 0) or 0
+            will_retry = retry_count < self.queue_manager.MAX_RETRIES
+            logger.error(
+                "✗ Error processing %s (attempt %d/%d): %s",
+                item_id,
+                retry_count + 1,
+                self.queue_manager.MAX_RETRIES + 1,
+                e,
+            )
+            if not will_retry:
+                logger.error("✗ Permanently failed %s after %d attempts", item_id, retry_count + 1)
             self.queue_manager.mark_failed(item_id, str(e), retry=True)
             self.stats["errors"] += 1
             return False

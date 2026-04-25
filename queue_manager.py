@@ -181,19 +181,24 @@ class QueueManager:
                 conn.commit()
                 return cursor.rowcount > 0
 
+    MAX_RETRIES = 3
+
     def mark_failed(self, item_id: str, error_message: str, retry: bool = True) -> bool:
         """Mark item as failed.
 
-        Args:
-            item_id: Queue item ID
-            error_message: Error description
-            retry: If True, mark as pending for retry; if False, mark as failed
-
-        Returns:
-            True if successful, False otherwise
+        When retry=True the item is put back to pending only if it has not yet
+        reached MAX_RETRIES; once the limit is hit it is permanently failed so
+        the worker does not spin on the same item indefinitely.
         """
         with self.lock:
             with sqlite3.connect(self.db_path) as conn:
+                if retry:
+                    row = conn.execute(
+                        "SELECT retry_count FROM queue WHERE id = ?", (item_id,)
+                    ).fetchone()
+                    current_retries = row[0] if row else 0
+                    retry = current_retries < self.MAX_RETRIES
+
                 status = DataStatus.PENDING.value if retry else DataStatus.FAILED.value
                 cursor = conn.execute(
                     """

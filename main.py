@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import csv
 import logging
 import os
@@ -14,6 +16,7 @@ from fastapi import FastAPI, File, HTTPException, UploadFile
 from pydantic import BaseModel
 from datetime import datetime
 from pypdf import PdfReader
+from agents.config import ADJUSTMENTS_DB
 from agents.relevancy_agent import RelevancyAgent
 from agents.query_agent import QueryAgent
 from queue_manager import queue_manager, DataSource
@@ -404,20 +407,20 @@ async def query_endpoint(request: QueryRequest) -> QueryResponse:
         raise HTTPException(status_code=500, detail=f"Query failed: {str(e)}")
 
 
-_ADJUSTMENTS_DB = Path(".baulog") / "adjustments.db"
+_ADJUSTMENTS_DB = ADJUSTMENTS_DB
 
 
 class AdjustmentSummary(BaseModel):
     id: str
     timestamp: str
-    summary: str
-    property: str
-    building: str
-    unit: str
-    category: str
-    action: str
-    section_path: str
-    markdown_path: str
+    summary: str | None = None
+    property: str | None = None
+    building: str | None = None
+    unit: str | None = None
+    category: str | None = None
+    action: str | None = None
+    section_path: str | None = None
+    markdown_path: str | None = None
 
 
 @app.get("/adjustments", response_model=list[AdjustmentSummary])

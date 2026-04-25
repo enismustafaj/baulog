@@ -95,7 +95,7 @@ class RelevancyAgent:
                 logger.info("Tool %s(%s) -> %s", tc["name"], tc["args"], result)
                 messages.append(ToolMessage(content=str(result), tool_call_id=tc["id"]))
 
-        structured_output = self._parse_structured_output(str(response.content))
+        structured_output = self._parse_structured_output(self._extract_text(response.content))
         return {
             "assessment": structured_output.model_dump(),
             "raw_response": response,
@@ -162,9 +162,16 @@ class RelevancyAgent:
                     "Known properties:\n{property_context}\n\n"
                     "Your task:\n"
                     "1. Identify which property the document belongs to. "
-                    "Use the exact property name from the list above. "
-                    "If the document mentions an owner name instead of the property name, "
-                    "call the lookup_property_by_owner tool to resolve it.\n"
+                    "Use the exact property name from the list above.\n"
+                    "   - If the property name is not directly stated, call "
+                    "lookup_property_by_owner for every name and email address "
+                    "you can find — try each one until you get a match.\n"
+                    "   - For emails: a PARTICIPANTS section lists every address from "
+                    "every header (From, To, CC, BCC, Reply-To, Sender). "
+                    "Call the tool for each entry in that list, using both the "
+                    "display name and the email address as separate queries.\n"
+                    "   - For invoices or letters: check all sender and recipient blocks.\n"
+                    "   - Also try any IBAN found in the document.\n"
                     "2. Extract the building name directly from the document text if mentioned. "
                     "Set to null if not mentioned.\n"
                     "3. Extract the unit name directly from the document text if mentioned. "
@@ -187,6 +194,43 @@ class RelevancyAgent:
     # ------------------------------------------------------------------
     # Output parsing
     # ------------------------------------------------------------------
+
+    def _extract_text(self, content) -> str:
+        """Normalise LLM response content to a plain string.
+
+        Handles all shapes Gemini / LangChain may return:
+        - plain str
+        - str that is a Python repr of a list/dict (stringified by an earlier layer)
+        - list of dicts  [{'type': 'text', 'text': '...'}]
+        - list of Pydantic-like objects with a .text attribute
+        """
+        import ast as _ast
+
+        if isinstance(content, str):
+            stripped = content.strip()
+            if stripped.startswith("[") or stripped.startswith("{"):
+                try:
+                    parsed = _ast.literal_eval(stripped)
+                    return self._extract_text(parsed)
+                except (ValueError, SyntaxError):
+                    pass
+            return content
+
+        if isinstance(content, list):
+            parts = []
+            for block in content:
+                if isinstance(block, dict):
+                    parts.append(block.get("text", str(block)))
+                elif hasattr(block, "text"):
+                    parts.append(str(block.text))
+                else:
+                    parts.append(str(block))
+            return "\n".join(parts)
+
+        if hasattr(content, "text"):
+            return str(content.text)
+
+        return str(content)
 
     def _parse_structured_output(self, content: str) -> RelevancyOutput:
         text = content.strip()

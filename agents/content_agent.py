@@ -17,7 +17,7 @@ from dotenv import load_dotenv
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate
 
-from agents.config import GEMINI_MODEL, PROPERTIES_DIR
+from agents.config import ADJUSTMENTS_DB, GEMINI_MODEL, PROPERTIES_DIR, SESSIONS_DIR
 from context_engine.engine import ContextEngine
 from context_engine.markdown_parser import MarkdownParser
 from context_engine.models import MarkdownSection
@@ -44,8 +44,8 @@ class ContentAgent:
         )
         self.parser = MarkdownParser()
         self.engine = ContextEngine(repo_path=PROPERTIES_DIR)
-        self._sessions_dir = Path(".baulog") / "entire-sessions"
-        self._db_path = Path(".baulog") / "adjustments.db"
+        self._sessions_dir = SESSIONS_DIR
+        self._db_path = ADJUSTMENTS_DB
         self._init_db()
 
     # ------------------------------------------------------------------
@@ -164,27 +164,45 @@ class ContentAgent:
         unit_name: str,
         category: str,
     ) -> MarkdownSection | None:
-        """Return the first section whose path matches all provided components."""
+        """Return the most specific section matching the given components.
+
+        Unit and building names are matched as substrings of the path elements
+        so that e.g. 'WE 49' matches the heading 'unit WE 49' and '16' matches
+        'building 16'.  Property must match the first path element exactly.
+        Category must match the last path element exactly.
+
+        When building/unit are absent (property-level document) the shallowest
+        matching section is preferred.
+        """
         norm_property = self._normalize(property_name)
         norm_building = self._normalize(building_name)
         norm_unit = self._normalize(unit_name)
         norm_category = self._normalize(category)
+
+        candidates: list[MarkdownSection] = []
 
         for section in sections:
             path_norm = [self._normalize(p) for p in section.path]
 
             if norm_category and path_norm[-1] != norm_category:
                 continue
-            if norm_unit and norm_unit not in path_norm:
+            if norm_unit and not any(norm_unit in p for p in path_norm):
                 continue
-            if norm_building and norm_building not in path_norm:
+            if norm_building and not any(norm_building in p for p in path_norm):
                 continue
             if norm_property and (not path_norm or path_norm[0] != norm_property):
                 continue
 
-            return section
+            candidates.append(section)
 
-        return None
+        if not candidates:
+            return None
+
+        # Prefer shallowest match when building/unit are not specified
+        if not norm_building and not norm_unit:
+            candidates.sort(key=lambda s: len(s.path))
+
+        return candidates[0]
 
     def _extract_body(self, path: Path, section: MarkdownSection) -> str:
         """Return the section body (lines after the heading) from the file."""
@@ -221,7 +239,44 @@ class ContentAgent:
                 "action": action,
             }
         )
-        return str(result.content).strip()
+        return self._extract_text(result.content).strip()
+
+    def _extract_text(self, content) -> str:
+        """Normalise LLM response content to a plain string.
+
+        Handles all shapes Gemini / LangChain may return:
+        - plain str
+        - str that is a Python repr of a list/dict (stringified by an earlier layer)
+        - list of dicts  [{'type': 'text', 'text': '...'}]
+        - list of Pydantic-like objects with a .text attribute
+        """
+        import ast as _ast
+
+        if isinstance(content, str):
+            stripped = content.strip()
+            if stripped.startswith("[") or stripped.startswith("{"):
+                try:
+                    parsed = _ast.literal_eval(stripped)
+                    return self._extract_text(parsed)
+                except (ValueError, SyntaxError):
+                    pass
+            return content
+
+        if isinstance(content, list):
+            parts = []
+            for block in content:
+                if isinstance(block, dict):
+                    parts.append(block.get("text", str(block)))
+                elif hasattr(block, "text"):
+                    parts.append(str(block.text))
+                else:
+                    parts.append(str(block))
+            return "\n".join(parts)
+
+        if hasattr(content, "text"):
+            return str(content.text)
+
+        return str(content)
 
     def _write_back(self, path: Path, section: MarkdownSection, new_body: str) -> None:
         """Replace the section body in the file, keeping the heading line intact."""
