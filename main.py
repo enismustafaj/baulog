@@ -1,6 +1,7 @@
 import csv
 import logging
 import os
+import sqlite3
 import threading
 import uuid
 from contextlib import asynccontextmanager
@@ -401,6 +402,35 @@ async def query_endpoint(request: QueryRequest) -> QueryResponse:
         return QueryResponse(answer=result["answer"], sources=result["sources"])
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Query failed: {str(e)}")
+
+
+_ADJUSTMENTS_DB = Path(".baulog") / "adjustments.db"
+
+
+class AdjustmentSummary(BaseModel):
+    id: str
+    timestamp: str
+    summary: str
+    property: str
+    building: str
+    unit: str
+    category: str
+    action: str
+    section_path: str
+    markdown_path: str
+
+
+@app.get("/adjustments", response_model=list[AdjustmentSummary])
+def get_adjustments(limit: int = 50) -> list[AdjustmentSummary]:
+    """Return recent content-agent adjustment summaries."""
+    if not _ADJUSTMENTS_DB.exists():
+        return []
+    with sqlite3.connect(_ADJUSTMENTS_DB) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            "SELECT * FROM adjustments ORDER BY timestamp DESC LIMIT ?", (limit,)
+        ).fetchall()
+    return [AdjustmentSummary(**dict(row)) for row in rows]
 
 
 if __name__ == "__main__":

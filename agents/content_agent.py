@@ -6,6 +6,7 @@ property Markdown file, asks the LLM to adjust it, and writes back.
 
 import json
 import os
+import sqlite3
 import subprocess
 import uuid
 from datetime import datetime, timezone
@@ -44,10 +45,23 @@ class ContentAgent:
         self.parser = MarkdownParser()
         self.engine = ContextEngine(repo_path=PROPERTIES_DIR)
         self._sessions_dir = Path(".baulog") / "entire-sessions"
+        self._db_path = Path(".baulog") / "adjustments.db"
+        self._init_db()
 
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
+
+    def history(self, limit: int = 20) -> list[dict[str, Any]]:
+        """Return the most recent adjustment summaries from the database."""
+        if not self._db_path.exists():
+            return []
+        with sqlite3.connect(self._db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                "SELECT * FROM adjustments ORDER BY timestamp DESC LIMIT ?", (limit,)
+            ).fetchall()
+        return [dict(row) for row in rows]
 
     def adjust(
         self,
@@ -104,6 +118,8 @@ class ContentAgent:
         # Append result to session transcript so the stop hook can read it
         with open(session_ref, "a", encoding="utf-8") as fh:
             fh.write(json.dumps(result) + "\n")
+
+        self._save_summary(session_id, session_ref, relevancy_output)
 
         # Fire stop in background — checkpoint creation can take several seconds
         self._fire_hook("stop", session_id, session_ref, action, background=True)
@@ -227,6 +243,56 @@ class ContentAgent:
 
         updated = lines[:body_start] + new_body_lines + lines[body_end:]
         path.write_text("".join(updated), encoding="utf-8")
+
+    def _init_db(self) -> None:
+        self._db_path.parent.mkdir(parents=True, exist_ok=True)
+        with sqlite3.connect(self._db_path) as conn:
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS adjustments (
+                    id            TEXT PRIMARY KEY,
+                    timestamp     TEXT,
+                    property      TEXT,
+                    building      TEXT,
+                    unit          TEXT,
+                    category      TEXT,
+                    action        TEXT,
+                    section_path  TEXT,
+                    markdown_path TEXT,
+                    summary       TEXT
+                )
+            """)
+
+    def _save_summary(
+        self,
+        session_id: str,
+        session_ref: str,
+        relevancy_output: dict[str, Any],
+    ) -> None:
+        try:
+            entry = json.loads(Path(session_ref).read_text(encoding="utf-8").splitlines()[0])
+        except (OSError, json.JSONDecodeError, IndexError):
+            return
+        property_ = relevancy_output.get("property", "")
+        building  = relevancy_output.get("building", "")
+        unit      = relevancy_output.get("unit", "")
+        category  = relevancy_output.get("category", "")
+        action    = relevancy_output.get("action", "")
+        summary   = f"{property_} · {building} · {unit} · {category}: {action}"
+
+        with sqlite3.connect(self._db_path) as conn:
+            conn.execute(
+                """INSERT OR REPLACE INTO adjustments
+                   (id, timestamp, property, building, unit, category, action, section_path, markdown_path, summary)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    session_id,
+                    datetime.now(timezone.utc).isoformat(),
+                    property_, building, unit, category, action,
+                    entry.get("section_path", ""),
+                    entry.get("markdown_path", ""),
+                    summary,
+                ),
+            )
 
     def _normalize(self, value: str) -> str:
         return " ".join(str(value).casefold().strip().strip(":").split())
