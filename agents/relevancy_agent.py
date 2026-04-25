@@ -8,10 +8,7 @@ import os
 from typing import Any
 from dotenv import load_dotenv
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain.agents import AgentExecutor, create_tool_calling_agent
-from langchain.tools import Tool
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain_core.messages import HumanMessage
+from langchain_core.prompts import ChatPromptTemplate
 
 load_dotenv()
 
@@ -39,24 +36,6 @@ class RelevancyAgent:
             temperature=0.3,  # Lower temperature for more consistent relevancy decisions
         )
 
-        self.tools = self._create_tools()
-        self.agent_executor = self._create_agent()
-
-    def _create_tools(self) -> list[Tool]:
-        """Create tools for the agent.
-
-        Returns:
-            List of tools the agent can use.
-        """
-        tools = [
-            Tool(
-                name="check_business_relevance",
-                func=self._check_business_relevance,
-                description="Check if data is relevant to business operations based on content analysis",
-            )
-        ]
-        return tools
-
     def _check_business_relevance(self, data: str) -> str:
         """Check if data is relevant to business operations.
 
@@ -82,31 +61,6 @@ class RelevancyAgent:
         result = chain.invoke({"data": data})
         return result.content
 
-
-    def _create_agent(self) -> AgentExecutor:
-        """Create the agent executor.
-
-        Returns:
-            Configured agent executor.
-        """
-        prompt = ChatPromptTemplate.from_messages(
-            [
-                (
-                    "system",
-                    "You are a data relevancy assessment agent. Your job is to evaluate unstructured data "
-                    "(emails, PDF documents, ERP system data, etc.) and determine if it's relevant to business operations. "
-                    "Use available tools to analyze the data comprehensively. "
-                    "Provide a final assessment: RELEVANT or NOT_RELEVANT with reasoning.",
-                ),
-                ("human", "{input}"),
-                MessagesPlaceholder(variable_name="agent_scratchpad"),
-            ]
-        )
-
-        agent = create_tool_calling_agent(self.llm, self.tools, prompt)
-        executor = AgentExecutor(agent=agent, tools=self.tools, verbose=True)
-        return executor
-
     def evaluate(self, data: str) -> dict[str, Any]:
         """Evaluate the relevancy of provided data.
 
@@ -116,19 +70,30 @@ class RelevancyAgent:
         Returns:
             Dictionary containing assessment and details.
         """
-        prompt = (
-            f"Evaluate this unstructured data for business relevancy:\n\n{data}\n\n"
-            "Provide a structured assessment with:\n"
-            "1. Relevancy decision (RELEVANT or NOT_RELEVANT)\n"
-            "2. Confidence level (HIGH, MEDIUM, LOW)\n"
-            "3. Key entities found\n"
-            "4. Business impact if relevant\n"
-            "5. Reasoning"
+        prompt = ChatPromptTemplate.from_messages(
+            [
+                (
+                    "system",
+                    "You are a data relevancy assessment agent. Evaluate unstructured data "
+                    "such as emails, PDF documents, ERP records, and messages. "
+                    "Determine whether the data is relevant to business operations.",
+                ),
+                (
+                    "human",
+                    "Evaluate this unstructured data for business relevancy:\n\n{data}\n\n"
+                    "Provide a structured assessment with:\n"
+                    "1. Relevancy decision (RELEVANT or NOT_RELEVANT)\n"
+                    "2. Confidence level (HIGH, MEDIUM, LOW)\n"
+                    "3. Key entities found\n"
+                    "4. Business impact if relevant\n"
+                    "5. Reasoning",
+                ),
+            ]
         )
 
-        result = self.agent_executor.invoke({"input": prompt})
+        chain = prompt | self.llm
+        result = chain.invoke({"data": data})
         return {
-            "assessment": result["output"],
+            "assessment": result.content,
             "raw_response": result,
         }
-
