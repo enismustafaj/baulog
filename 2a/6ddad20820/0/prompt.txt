@@ -1,0 +1,1 @@
+so the storage system for the markdown file is just the filesytem. so configure a path/directory where this will be stored and read from. make sure that when a user prompts a request, the markdown is parsed as a tree and is searched through rag and only the sections that make sense in the request should be provided to the query agent.
