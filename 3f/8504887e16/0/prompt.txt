@@ -1,0 +1,53 @@
+this data was feed to the application but it could not find a section where to apply this. can you test what action is returned when the first agent is triggered with this data:
+
+---
+
+this data was feed to the application but it could not find a section where to apply this. can you test what action is returned when the first agent is triggered with this data: Hausmeister Mueller GmbH Luigi-Loos-Ring 6/3 | 11116 Wolfenbüttel | Tel: (08367) 36576 Hausmeister Mueller GmbH . Luigi-Loos-Ring 6/3 . 11116 Wolfenbüttel Huber & Partner Immobilienverwaltung GmbH Friedrichstrasse 112 10117 Berlin RECHNUNG Rechnungsnr.: INV-2026-0195 Datum: 01.01.2026 Leistungsdatum: 27.12.2025 Ust-ID: DE340781088 Steuernr.: 23/458/82910 Rechnung Leistungszeitraum: 12.12.2025 - 01.01.2026 wir erlauben uns, Ihnen folgende Leistungen in Rechnung zu stellen: Pos Beschreibung Menge EP netto Gesamt netto 1 Muelltonnen-Bereitstellung 1 pauschal 85,00 EUR 85,00 EUR 2 Hausmeistertaetigkeit monatliche Pauschale 1 pauschal 650,00 EUR 650,00 EUR 3 Winterdienst Pauschale 1 pauschal 180,00 EUR 180,00 EUR Summe netto: 915,00 EUR zzgl. 19% MwSt: 173,85 EUR Gesamtbetrag brutto: 1.088,85 EUR Zahlbar innerhalb von 14 Tagen ohne Abzug. Bitte ueberweisen Sie auf: IBAN: DE94 1007 0124 0494 5198 32 BIC: DEUTDEBB101 Verwendungszweck: INV-2026-0195 Hausmeister Mueller GmbH . Geschaeftsfuehrer: Slawomir Sölzer . Ust-ID: DE340781088
+
+---
+
+the application added this to the mardown. this is the raw output from the agent, we need to extract the text field: [{'type': 'text', 'text': '- Hausmeister Mueller GmbH: Janitorial services, garbage bin provision, and winter service (12.12.2025 - 01.01.2026)', 'extras': {'signature': 'REDACTED/uzK2isOWgLFTC96/roIusFN5KxL0MeZG1Plsv/REDACTED/REDACTED/REDACTED/88sdjahpQkAs32YRl86/REDACTED/REDACTED/kg4aKygtDKkoPMuM2kTKC6MNWksls7DO/REDACTED/qqQH5a03P2BPwau+ufgqdfxQ7+X4IssWwfuX/REDACTED/REDACTED/2Km9ghM5XOyLhGtxDOuCzNc/REDACTED/TM5TIs0G4BQOXF9/REDACTED/REDACTED/bQKE8Rw6JcKBPl/REDACTED'}}]
+
+---
+
+can you fix anything that could be wrong with the get adjustment api?
+
+---
+
+I meant with the endpoint
+
+---
+
+for the emails the relevancy email should examine the whole content and try to find the property using the names of the participants in the email or the content of the email or the subject.
+
+---
+
+log the email content
+
+---
+
+the relevancy email should not only look for the property owner using the tool based on the to field of the email, but all the possible fields.
+
+---
+
+I got this log from the app. isnt it able to parse the tenant section from a unit in the markdown file: 2026-04-26 00:38:48,078 - worker - WARNING - Could not update markdown for 7dafbfdc-0c00-41f8-8016-12447d900256: No section found for property='WEG Immanuelkirchstraße 26', building='', unit='WE 49', category='tenant'
+
+---
+
+the worker seems to be kinda stuck after I uploaded a csv file. what is happening there?
+
+---
+
+also I still got such content added to the markdown file, just the text part of the object is needed: {'type': 'text', 'text': '- Hausmeister Mueller GmbH: Janitorial services (Invoice: 1,088.85 EUR)'}]
+
+---
+
+move the adjustment db file to the other database location and add the entire sessions directory in the gitignore
+
+---
+
+fix the issues with the adjustment database. make it to be in the right location, even from the entire custom plugin, and the api side.
+
+---
+
+adjust the readme file to include everything about the application and remove the other md files that were about documentation
