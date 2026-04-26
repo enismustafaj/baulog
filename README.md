@@ -2,6 +2,46 @@
 
 Property management document processing system. Accepts uploaded files (PDF, CSV, EML, audio), classifies them against a Markdown-based property registry using LangChain and Google Gemini, updates the relevant section in the property file, and exposes a natural-language query interface over the registry.
 
+## Architecture
+
+```mermaid
+flowchart LR
+    subgraph IN [Input]
+        PDF([PDF])
+        CSV([CSV])
+        EML([EML])
+        AUDIO([Audio])
+    end
+
+    subgraph AGENTS [Agent Pipeline]
+        REL[RelevancyAgent]
+        CONTENT[ContentAgent]
+    end
+
+    subgraph ENTIRE [Entire.io]
+        PLUGIN[entire-agent-baulog]
+        SESSIONS[(uuid.jsonl)]
+        CHECKPOINTS[Checkpoints]
+        SEARCH[entire-search]
+    end
+
+    PDF & CSV & EML & AUDIO --> API[FastAPI]
+    API -->|enqueue| DB[(baulog_queue.db)]
+    DB --> REL
+    REL -->|property / building / unit / category| CONTENT
+    CONTENT -->|update section| MDF[["data/properties/*.md"]]
+    CONTENT -->|session log| SESSIONS
+    CONTENT -->|summary| HIST[(adjustments.db)]
+    CONTENT -->|hooks| PLUGIN
+    PLUGIN -->|read sessions| SESSIONS
+    PLUGIN -->|changed paths| CHECKPOINTS
+    MDF --> CHECKPOINTS
+    CHECKPOINTS --> SEARCH
+    MDF --> QA[QueryAgent]
+    API -->|/query| QA
+    API -->|/adjustments| HIST
+```
+
 ## How it works
 
 ```
@@ -327,6 +367,27 @@ Both Claude Code and Codex have an `entire-search` sub-agent registered. It is i
 | Core protocol | `info`, `detect`, `get-session-id`, `get-session-dir`, `resolve-session-file`, `read-session`, `write-session`, `read-transcript`, `chunk-transcript`, `reassemble-transcript`, `format-resume-command` |
 | `hooks` | `parse-hook`, `install-hooks`, `uninstall-hooks`, `are-hooks-installed` |
 | `transcript_analyzer` | `get-transcript-position`, `extract-modified-files` |
+
+**Session lifecycle — how every Markdown adjustment becomes an Entire checkpoint:**
+
+```mermaid
+sequenceDiagram
+    participant CA as ContentAgent
+    participant MD as property.md
+    participant JL as uuid.jsonl
+    participant DB as adjustments.db
+    participant P as entire-agent-baulog
+
+    CA->>JL: create session file
+    CA->>P: session-start hook
+    CA->>MD: locate section, rewrite via Gemini, write back
+    CA->>JL: append result (markdown_path, original, adjusted)
+    CA->>DB: save adjustment summary
+    CA-)P: stop hook (background)
+    P->>JL: extract-modified-files from byte offset
+    JL-->>P: changed .md paths
+    P-->>P: create Entire Checkpoint
+```
 
 **Installation:**
 
