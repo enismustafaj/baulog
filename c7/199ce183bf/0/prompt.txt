@@ -1,0 +1,17 @@
+check the repo and see if this fits into a 2 minute demo:Property managers often struggle with fragmented data silos, making it nearly impossible to maintain a clear, real-time overview of maintenance history and tenant communications across multiple platforms. Baulog is system that help property managers to have full observability over their properties . Baulog can be plugged to different data sources, like email files, pdf, csv, audio recordings, and aggregate every event into a single markdown file which is used by the agent to resolve customer or internal property issue.  Firstly, we will ask the agent to provide some details on the recent issues reported in this unit. <the agent shows some info>. We will try to ask a question that is not ingested yet in the property markdown file. <agent cannot reply>. We will ingest the audio and the email file into baulog and it will update the property md file. the information is extraxcted from the files and stored in a queue where async workers pick it up and start the agentit workflow. it consists of 2 agents, first which extracts the semantics of the document content and the other that makes the changes in the md file. by using a md parser we fetch only the section that the event needs to be recorded. <we prompt the agent again to verify the result>. Baulog will also provide a history of the reocrdings which was done using the entire cli. we used the same concept entire uses for human-agent code collaboration into a custom agent where each change agent made into the markdown in a session was extracted as a summary by entire.
+
+---
+
+remove from adjustemt database the one that is about uni WE33
+
+---
+
+do the same thing again
+
+---
+
+do the same thing again
+
+---
+
+add this frontend link to readme: https://bau-log.lovable.app/
