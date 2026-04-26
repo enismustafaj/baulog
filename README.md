@@ -287,6 +287,72 @@ uv run python worker.py --batch-size 20 --poll-interval 2
 
 ---
 
+## Entire integration
+
+This repository is integrated with [Entire](https://entire.io) — an AI session checkpoint and search tool. Entire automatically snapshots every Claude Code and Codex session so you can search and replay past work.
+
+### Hook configuration
+
+| File | Purpose |
+|---|---|
+| `.claude/settings.json` | Hooks for Claude Code — fires on `SessionStart`, `SessionEnd`, `Stop`, `UserPromptSubmit`, and after `Task` / `TodoWrite` tool calls |
+| `.codex/hooks.json` | Hooks for Codex — fires on `SessionStart`, `Stop`, `UserPromptSubmit` |
+| `.codex/config.toml` | Enables Codex hook support |
+| `.entire/settings.json` | Enables Entire for this repo, enables external agents |
+| `.claude/agents/entire-search.md` | Claude Code sub-agent definition |
+| `.codex/agents/entire-search.toml` | Codex sub-agent definition |
+
+### entire-search sub-agent
+
+Both Claude Code and Codex have an `entire-search` sub-agent registered. It is invoked automatically when you ask about previous work, past sessions, earlier prompts, or historical context. It uses `entire search --json` to query the checkpoint history for this repository and returns the most relevant matches.
+
+### entire-agent-baulog
+
+`entire-agent-baulog` is a custom Entire external agent plugin that connects the Baulog `ContentAgent` to the Entire checkpoint system. It is a Python script that must be placed on `$PATH` so the Entire CLI can discover and invoke it automatically.
+
+**What it does:**
+
+- Implements the Entire external agent protocol (version 1) over stdin/stdout JSON
+- Fires three hook events tied to `ContentAgent` operations:
+  - `session-start` — when a content-adjustment operation begins
+  - `stop` — when an adjustment turn completes
+  - `session-end` — when the session terminates
+- Stores session transcripts as JSONL files in `.baulog/entire-sessions/`
+- The `extract-modified-files` command parses those JSONL files to tell Entire which Markdown property files were changed by `ContentAgent.adjust()` — enabling Entire to create precise checkpoints of property file edits
+
+**Capabilities implemented:**
+
+| Capability | Subcommands |
+|---|---|
+| Core protocol | `info`, `detect`, `get-session-id`, `get-session-dir`, `resolve-session-file`, `read-session`, `write-session`, `read-transcript`, `chunk-transcript`, `reassemble-transcript`, `format-resume-command` |
+| `hooks` | `parse-hook`, `install-hooks`, `uninstall-hooks`, `are-hooks-installed` |
+| `transcript_analyzer` | `get-transcript-position`, `extract-modified-files` |
+
+**Installation:**
+
+```bash
+# Make the script executable and place it on PATH
+chmod +x entire-agent-baulog
+cp entire-agent-baulog ~/.local/bin/entire-agent-baulog
+
+# Verify Entire can find it
+entire agents list
+```
+
+### Requirements
+
+The `entire` CLI must be installed and on your `PATH`. If it is not found the hooks exit silently and no checkpoints are created.
+
+```bash
+# See: https://docs.entire.io/cli/installation#installation-methods
+```
+
+### Gitignored paths
+
+`.baulog/entire-sessions/` is gitignored — session checkpoint files are local only and are never committed.
+
+---
+
 ## Project structure
 
 ```
