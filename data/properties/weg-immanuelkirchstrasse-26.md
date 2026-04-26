@@ -468,6 +468,7 @@ Huber & Partner Immobilienverwaltung GmbH
 
 ###### tenant
 - Carsten Austermühle is inquiring about the status of his security deposit refund for unit WE 31, seven weeks after moving out.
+- WE 31: Defective kitchen window reported by Carsten Austermühle; property management is currently reviewing the repair request.
 
 ##### unit WE 32
 ###### maintenance
@@ -478,14 +479,16 @@ Huber & Partner Immobilienverwaltung GmbH
 
 
 ##### unit WE 33
+
 ###### maintenance
 
 ###### rent
 
 ###### tenant
 
-- WE 31: Defective kitchen window reported by Carsten Austermühle; property management is currently reviewing the repair request.
+##### unit WE 34
 
+###### maintenance
 - Hanna Schweitzer reported a water leak in the bathroom of unit WE 34; the property management acknowledged the message and is checking the matter.
 
 ###### rent
