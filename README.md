@@ -1,6 +1,6 @@
 # Baulog
 
-Property management document processing system. Accepts uploaded files (PDF, CSV, EML), classifies them against a Markdown-based property registry using LangChain and Google Gemini, updates the relevant section in the property file, and exposes a natural-language query interface over the registry.
+Property management document processing system. Accepts uploaded files (PDF, CSV, EML, audio), classifies them against a Markdown-based property registry using LangChain and Google Gemini, updates the relevant section in the property file, and exposes a natural-language query interface over the registry.
 
 ## How it works
 
@@ -8,13 +8,18 @@ Property management document processing system. Accepts uploaded files (PDF, CSV
 File uploaded via API
         ↓
 Text extracted & enqueued (immediate response)
+  PDF  — text extracted in-memory via pypdf
+  CSV  — each row enqueued as a separate item
+  EML  — file saved to disk, parsed by worker
+  Audio — file saved to disk, transcribed by worker via Gradium STT
         ↓
 Worker picks up item
         ↓
 RelevancyAgent — identifies property, building, unit, category
-  └─ calls lookup_property_by_owner tool if needed
+  └─ calls lookup_property_by_owner tool when owner name / email / IBAN
+     appears instead of the property name
         ↓
-ContentAgent — updates the matching section in the Markdown file
+ContentAgent — finds the matching section in the Markdown file and updates it
         ↓
 Assessment stored in DB, result queryable via API
 ```
@@ -33,7 +38,7 @@ uv sync
 
 # Configure environment
 cp .env.example .env
-# Fill in GOOGLE_API_KEY in .env
+# Fill in at minimum GOOGLE_API_KEY (and GRADIUM_API_KEY if using audio)
 
 # Start the API server (worker starts automatically)
 uv run python main.py
@@ -46,6 +51,7 @@ uv run python main.py
 | Variable | Default | Description |
 |---|---|---|
 | `GOOGLE_API_KEY` | — | **Required.** Google Gemini API key |
+| `GRADIUM_API_KEY` | — | Required for audio transcription (speech-to-text) |
 | `GEMINI_MODEL` | `gemini-2.5-flash-preview-05-20` | Gemini model used by all agents |
 | `BAULOG_PROPERTIES_DIR` | `data/properties` | Directory where property Markdown files are stored |
 | `BAULOG_RUN_WORKER` | `true` | Set to `false` to disable the background worker on startup |
@@ -97,7 +103,7 @@ Section content is a list of `- item` bullet points. Empty sections are valid pl
 
 ## Owner database
 
-Owners are stored in SQLite (`data/baulog_queue.db`) and used by the RelevancyAgent to match documents that reference a management company rather than the property name directly.
+Owners are stored in SQLite (`data/baulog_queue.db`) and used by the RelevancyAgent to match documents that reference a management company rather than the property name directly. The search matches on name, email address, or IBAN — and falls back to word-by-word matching when the full query has no result, so STT transcription variants (e.g. `"und"` instead of `"&"`) still resolve correctly.
 
 ```python
 from owner_repository import OwnerRepository
@@ -118,23 +124,22 @@ repo.add(
 )
 ```
 
-The agent searches by name, email address, or IBAN, so any of those identifiers appearing in a document will resolve to the correct property.
-
 ---
 
 ## API endpoints
 
 ### File upload
 
-| Method | Path | Description |
-|---|---|---|
-| `POST` | `/upload/pdf` | Upload a PDF — text extracted in-memory, enqueued |
-| `POST` | `/upload/csv` | Upload a CSV — each data row enqueued as a separate item |
-| `POST` | `/upload/eml` | Upload an `.eml` email file |
+| Method | Path | Accepted formats | Description |
+|---|---|---|---|
+| `POST` | `/upload/pdf` | `.pdf` | Text extracted in-memory, one queue item |
+| `POST` | `/upload/csv` | `.csv` | Each data row enqueued as a separate item |
+| `POST` | `/upload/eml` | `.eml` | Email file saved to disk, parsed by worker |
+| `POST` | `/upload/audio` | `.wav .mp3 .m4a .ogg .flac .webm` | Audio saved to disk, transcribed via Gradium STT |
 
-All upload endpoints accept `multipart/form-data` with a single `file` field. No extra headers required.
+All endpoints accept `multipart/form-data` with a single `file` field. No extra headers required.
 
-**PDF / EML response:**
+**Single-file response (PDF / EML / audio):**
 ```json
 {
   "status": "enqueued",
@@ -164,6 +169,8 @@ All upload endpoints accept `multipart/form-data` with a single `file` field. No
 | `GET` | `/queue/status` | Counts by status (pending / processing / completed / failed) |
 | `GET` | `/queue/item/{id}` | Details and assessment for a single item |
 | `GET` | `/queue/completed?limit=100&hours=24` | Recently completed items |
+
+Failed items are retried automatically up to **3 times** before being permanently marked as failed.
 
 ---
 
@@ -238,20 +245,32 @@ Reads uploaded document text and outputs:
 - `category` — one of `insurance | maintenance | rent | tenant`
 - `action` — one or two sentence summary
 
-When the property name is not in the document, the agent calls the `lookup_property_by_owner` tool with every name, email, and IBAN it finds. The tool searches the owner database and returns the matching property name.
+When the property name is not in the document, the agent calls the `lookup_property_by_owner` tool, trying every name, email, and IBAN found in the document. For emails, all addresses from all header fields (From, To, CC, BCC, Reply-To, Sender) are collected and tried individually.
 
 ### ContentAgent
 
-Takes the RelevancyAgent output, finds the matching section in the Markdown file (using substring path matching so `WE 49` matches heading `unit WE 49`), asks the LLM to update the content based on the action, and writes the result back to the file. Property-level documents prefer the shallowest matching section.
+Takes the RelevancyAgent output, finds the matching section in the Markdown file, asks the LLM to update the content based on the action, and writes the result back to the file.
+
+Section matching uses substring path matching with space-stripped fallback, so identifiers like `WE49` (from audio transcription) still match the heading `unit WE 49`. Property-level documents (no building or unit) prefer the shallowest matching section.
 
 ### QueryAgent
 
 RAG pipeline over the property Markdown files:
 1. Parses all files into `MarkdownSection` objects with heading paths and line numbers
-2. Skips pure structural headings with no body
+2. Skips pure structural headings with no body content
 3. Scores sections: path hits × 3 + body hits
-4. Takes top 8 by score, re-sorts into document order
+4. Takes top 8 by score, re-sorts into document order for coherent context
 5. Passes formatted sections to Gemini with a system prompt that restricts the answer to the retrieved data
+
+---
+
+## Audio transcription
+
+Audio files are transcribed via the [Gradium](https://gradium.ai) speech-to-text WebSocket API (`wss://api.gradium.ai/api/speech/asr`). The file is loaded, resampled to 24 kHz mono PCM, and streamed in 80 ms chunks. The transcript is then passed through the normal RelevancyAgent → ContentAgent pipeline.
+
+**Supported formats:** WAV, MP3, M4A, OGG, FLAC, WebM
+
+Requires `GRADIUM_API_KEY` in `.env`.
 
 ---
 
@@ -260,13 +279,11 @@ RAG pipeline over the property Markdown files:
 The background worker runs inside the same process as the API server (controlled by `BAULOG_RUN_WORKER`). It can also be run standalone:
 
 ```bash
-uv run python worker.py               # continuous polling
-uv run python worker.py --once        # process one batch then exit
-uv run python worker.py --stats       # print queue stats then exit
+uv run python worker.py                           # continuous polling
+uv run python worker.py --once                    # process one batch then exit
+uv run python worker.py --stats                   # print queue stats then exit
 uv run python worker.py --batch-size 20 --poll-interval 2
 ```
-
-Items that fail are retried up to 3 times before being permanently marked as failed.
 
 ---
 
@@ -274,13 +291,14 @@ Items that fail are retried up to 3 times before being permanently marked as fai
 
 ```
 baulog/
-├── main.py                  # FastAPI app, upload endpoints, query endpoint
+├── main.py                  # FastAPI app — upload, query, adjustments endpoints
 ├── worker.py                # Background queue worker
-├── queue_manager.py         # SQLite queue (baulog_queue.db)
+├── queue_manager.py         # SQLite queue (data/baulog_queue.db)
 ├── owner_repository.py      # SQLite owner → property index
+├── audio_transcriber.py     # Gradium STT WebSocket client
 ├── agents/
-│   ├── config.py            # Shared config (model, paths)
-│   ├── relevancy_agent.py   # Document classifier with owner tool
+│   ├── config.py            # Shared config (model, paths, API keys)
+│   ├── relevancy_agent.py   # Document classifier with owner lookup tool
 │   ├── content_agent.py     # Markdown section updater
 │   └── query_agent.py       # RAG query agent
 ├── context_engine/
@@ -289,7 +307,9 @@ baulog/
 │   └── models.py            # PropertyContext, BuildingContext, UnitContext
 ├── data/
 │   ├── properties/          # Property Markdown files (BAULOG_PROPERTIES_DIR)
-│   ├── uploads/eml/         # Saved EML files (worker reads these)
+│   ├── uploads/
+│   │   ├── eml/             # Saved EML files (worker reads these)
+│   │   └── audio/           # Saved audio files (worker transcribes these)
 │   ├── baulog_queue.db      # Queue + owner database
 │   └── adjustments.db       # Content-agent update history
 ├── .env.example
