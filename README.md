@@ -13,9 +13,10 @@ flowchart LR
         AUDIO([Audio])
     end
 
-    subgraph AGENTS [Agent Pipeline]
-        REL[RelevancyAgent]
-        CONTENT[ContentAgent]
+    subgraph WORKERS [Parallel Workers]
+        direction TB
+        W1["Worker 1\nRelevancyAgent / ContentAgent"]
+        W2["Worker 2\nRelevancyAgent / ContentAgent"]
     end
 
     subgraph ENTIRE [Entire.io]
@@ -25,16 +26,16 @@ flowchart LR
         SEARCH[entire-search]
     end
 
-    PDF & CSV & EML & AUDIO --> API[FastAPI]
+    IN --> API[FastAPI]
     API -->|enqueue| DB[(baulog_queue.db)]
-    DB --> REL
-    REL -->|property / building / unit / category| CONTENT
-    CONTENT -->|update section| MDF[["data/properties/*.md"]]
-    CONTENT -->|session log| SESSIONS
-    CONTENT -->|summary| HIST[(adjustments.db)]
-    CONTENT -->|hooks| PLUGIN
-    PLUGIN -->|read sessions| SESSIONS
-    PLUGIN -->|changed paths| CHECKPOINTS
+    DB --> W1 & W2
+    WORKERS --> MDF[["data/properties/*.md"]]
+    WORKERS -->|hooks| PLUGIN
+    WORKERS --> SESSIONS
+    WORKERS --> HIST[(adjustments.db)]
+    SESSIONS --> PLUGIN
+    PLUGIN --> CHECKPOINTS
+    HIST -. same session_id .-> CHECKPOINTS
     MDF --> CHECKPOINTS
     CHECKPOINTS --> SEARCH
     MDF --> QA[QueryAgent]
@@ -386,7 +387,7 @@ sequenceDiagram
     CA-)P: stop hook (background)
     P->>JL: extract-modified-files from byte offset
     JL-->>P: changed .md paths
-    P-->>P: create Entire Checkpoint
+    Note over P: creates Entire Checkpoint
 ```
 
 **Installation:**
