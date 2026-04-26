@@ -3,9 +3,10 @@
   "checkpoint_id": "6fa62e3e127a",
   "strategy": "manual-commit",
   "branch": "main",
-  "checkpoints_count": 1,
+  "checkpoints_count": 3,
   "files_touched": [
-    "agents/query_agent.py"
+    "agents/query_agent.py",
+    "data/properties/weg-immanuelkirchstrasse-26.md"
   ],
   "sessions": [
     {
@@ -13,13 +14,19 @@
       "transcript": "/6f/a62e3e127a/0/full.jsonl",
       "content_hash": "/6f/a62e3e127a/0/content_hash.txt",
       "prompt": "/6f/a62e3e127a/0/prompt.txt"
+    },
+    {
+      "metadata": "/6f/a62e3e127a/1/metadata.json",
+      "transcript": "/6f/a62e3e127a/1/full.jsonl",
+      "content_hash": "/6f/a62e3e127a/1/content_hash.txt",
+      "prompt": "/6f/a62e3e127a/1/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 3050,
-    "cache_creation_tokens": 1016167,
-    "cache_read_tokens": 66218884,
-    "output_tokens": 214852,
-    "api_call_count": 349
+    "input_tokens": 3101,
+    "cache_creation_tokens": 1089933,
+    "cache_read_tokens": 68091692,
+    "output_tokens": 236289,
+    "api_call_count": 386
   }
 }

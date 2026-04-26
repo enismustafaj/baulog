@@ -1,0 +1,32 @@
+based on the markdown parser what are the units of building 16
+
+---
+
+based on the custom plugin for entire in ther application, can i run this commands for the sessions it has generated: # Find the latest checkpoint
+entire sessions list
+
+# Explain it with AI summary
+entire explain -c <checkpoint-id> --generate
+
+---
+
+I meant the sessions in the .baulog directory
+
+---
+
+using the markdown parser in the application itself what rae the units of building 16
+
+---
+
+this was one conversation with the query agent, it i=did not fine the unit:
+what is the latest development in unit W33 in building 16?
+
+The provided property data does not contain any information regarding unit W33 (or WE 33) in building 16. Information is only available for units WE 01, WE 02, WE 03, WE 04, WE 22, and WE 50.
+
+---
+
+fix the stuff
+
+---
+
+why is the response from the query agent in this format:[{'type': 'text', 'text': "Frau Caroline Bohlander has raised the following issues:\n\n* Maintenance Reserve: She requested an explanation for the lower-than-planned maintenance reserve in the 2023 house money settlement.\n* Special Assessment: She is objecting to a special assessment of 2,663 EUR.\n* Gutter Replacement: She proposed an agenda item for the owners' meeting regarding the replacement of gutters and mentioned having an offer for the work.", 'extras': {'signature': 'REDACTED/REDACTED/REDACTED/REDACTED/D80Y3qZe2/l8GFk+jI0AK1mzy7gN6iEu7Kl7G+r/nTZfs3nwGM36zR5mvar7/IK66oX4/REDACTED/REDACTED/REDACTED/REDACTED/REDACTED/REDACTED/qm0l4ZJYJaM/WSnkgOtc9ei1p8/REDACTED/REDACTED/E9mcsK4d9OwNGEpaFkIKV4SL4/q37WSM3MAU+tfLNe7oLpZa23b7ZA6cxWW/LYrX7o8imw/sfPSo7DVyqy5T1C2X64d0zj2/REDACTED/l6jpI4WXs0xZcxiA6QkGJhT/IYI9K0ypxZ/7qPXezMZOgD/VEbqpI5/REDACTED/I/LB4qD+4ts9Czxe3r/REDACTED'}}]
