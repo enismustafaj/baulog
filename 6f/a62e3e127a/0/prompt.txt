@@ -1,0 +1,73 @@
+I got this error for the audio processing: 2026-04-26 01:24:37,713 - worker - ERROR - ✗ Error processing 3c9e5133-a143-4839-abea-ff3c33c9e378 (attempt 4/4): 1 validation error for lookup_property_by_owner
+query
+  Field required [type=missing, input_value={'file_path': 'data/uploa...oice-recorder.com_.wav'}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.13/v/missing
+2026-04-26 01:24:37,713 - worker - ERROR - ✗ Permanently failed 3c9e5133-a143-4839-abea-ff3c33c9e378 after 4 attempts
+
+---
+
+The audio that is uploaded should be converted to text via gradium and the extracted text is given to the relevancy agent and the pipeline continues as usual. If the audio transcriber agent is not needed, remove it.
+
+---
+
+I am getting this error now: 2026-04-26 01:33:02,882 - worker - ERROR - ✗ Error processing 568f9657-f362-4d8c-b9f5-e486ad97d2a5 (attempt 2/4): Gradium STT error (1011): Message validation error
+
+---
+
+I am getting this error now: 2026-04-26 01:35:24,605 - worker - ERROR - ✗ Error processing 39feda7e-035b-4c36-abe2-e217b8d59b25 (attempt 1/4): Unexpected setup response from Gradium: {'type': 'error', 'client_req_id': None, 'message': "unsupported output format 'pcm_s16le', supported formats: 'pcm', 'pcm_24000', 'ulaw_8000', 'alaw_8000', 'wav', 'opus'\nNeed more support? Feel free to reach out by email at support@gradium.ai or on discord https://discord.com/invite/bcysuPRzXE", 'code': 1011}
+
+---
+
+getting this error now: 2026-04-26 01:36:41,341 - worker - ERROR - ✗ Error processing ba396583-d4e0-4356-8274-6ce139cfd3d6 (attempt 1/4): Gradium STT error (1011): Message validation error
+
+---
+
+getting this now: 2026-04-26 01:38:08,435 - worker - ERROR - ✗ Error processing fb2b047c-fcbe-4124-b5eb-9fdd50c36a44 (attempt 1/4): no close frame received or sent
+
+---
+
+getting this: 2026-04-26 01:39:21,836 - worker - ERROR - ✗ Error processing abfeab94-37d0-4784-b451-769e2294c3bd (attempt 1/4): no close frame received or sent. have a look at the docs of gradium and fix the whole thing: https://docs.gradium.ai/
+
+---
+
+2026-04-26 01:52:22,051 - agents.relevancy_agent - INFO - Tool lookup_property_by_owner({'query': 'Huber und Partner Immobilienverwaltung GmbH'}) -> No property found for 'Huber und Partner Immobilienverwaltung GmbH'.
+
+---
+
+getting this: 2026-04-26 01:55:07,970 - worker - WARNING - Could not update markdown for 34082f94-6a74-482f-9168-1f87a71d975f: No section found for property='WEG Immanuelkirchstraße 26', building='', unit='WE49', category='tenant'
+
+---
+
+adjust the readme with the latest changes
+
+---
+
+can you add to the readme  about the entire plugin we have created in the project
+
+---
+
+I also meant about the entire-agent-baulog script
+
+---
+
+can you double check the markdown parser whether it parses the hierachy correctly. Property has info about insurance and maintenance, it has buildings, which have info about maintenace, rent, and buildings have unit which have info about maintenance, rent and tenant. make sure the hierarchy is parsed correctly base of the tags in markdown.
+
+---
+
+why is everything being added under building 2 maintenance?
+
+---
+
+can yo ucheck whether the owner is in the db
+
+---
+
+why do i get this: 2026-04-26 04:18:31,284 - agents.relevancy_agent - INFO - Tool lookup_property_by_owner({'query': 'Huber & Partner Immobilienverwaltung GmbH'}) -> No property found for 'Huber & Partner Immobilienverwaltung GmbH'
+
+---
+
+remove the pdf content that is in the queue and not picked up yet
+
+---
+
+increase th number of workers that pickup tasks from the queue
