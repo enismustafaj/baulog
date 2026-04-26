@@ -53,43 +53,49 @@ def _env_bool(name: str, default: bool = True) -> bool:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    """Start and stop the queue worker with the API server."""
-    worker = None
-    worker_thread = None
+    """Start and stop the queue workers with the API server."""
+    workers: list[QueueWorker] = []
+    threads: list[threading.Thread] = []
 
     if _env_bool("BAULOG_RUN_WORKER", default=True):
         if relevancy_agent is None:
-            logger.warning("Queue worker not started because the relevancy agent is not initialized")
+            logger.warning("Queue workers not started because the relevancy agent is not initialized")
         else:
             batch_size = int(os.getenv("BAULOG_WORKER_BATCH_SIZE", "10"))
             poll_interval = int(os.getenv("BAULOG_WORKER_POLL_INTERVAL", "5"))
-            worker = QueueWorker(
-                batch_size=batch_size,
-                poll_interval=poll_interval,
-                initialize_agent=False,
-                agent=relevancy_agent,
-            )
-            worker_thread = threading.Thread(
-                target=worker.run,
-                name="baulog-queue-worker",
-                daemon=True,
-            )
-            app.state.queue_worker = worker
-            app.state.queue_worker_thread = worker_thread
-            worker_thread.start()
-            logger.info("Queue worker started with the API server")
+            worker_count = int(os.getenv("BAULOG_WORKER_COUNT", "2"))
+
+            for i in range(worker_count):
+                worker = QueueWorker(
+                    batch_size=batch_size,
+                    poll_interval=poll_interval,
+                    initialize_agent=True,
+                )
+                thread = threading.Thread(
+                    target=worker.run,
+                    name=f"baulog-queue-worker-{i + 1}",
+                    daemon=True,
+                )
+                workers.append(worker)
+                threads.append(thread)
+                thread.start()
+                logger.info("Queue worker %d/%d started", i + 1, worker_count)
     else:
-        logger.info("Queue worker disabled by BAULOG_RUN_WORKER")
+        logger.info("Queue workers disabled by BAULOG_RUN_WORKER")
+
+    app.state.queue_workers = workers
+    app.state.queue_worker_threads = threads
 
     try:
         yield
     finally:
-        if worker is not None:
+        for worker in workers:
             worker.running = False
             worker.stop_event.set()
-        if worker_thread is not None:
-            worker_thread.join(timeout=10)
-            logger.info("Queue worker stopped")
+        for thread in threads:
+            thread.join(timeout=10)
+        if workers:
+            logger.info("%d queue worker(s) stopped", len(workers))
 
 
 app = FastAPI(
@@ -156,20 +162,21 @@ def read_root():
 @app.get("/health")
 def health_check():
     """Health check endpoint"""
-    agent_status = "ready" if relevancy_agent else "not_initialized"
-    worker = getattr(app.state, "queue_worker", None)
-    worker_thread = getattr(app.state, "queue_worker_thread", None)
-    worker_status = (
-        "running"
-        if worker_thread is not None and worker_thread.is_alive()
-        else "not_running"
-    )
+    workers = getattr(app.state, "queue_workers", [])
+    threads = getattr(app.state, "queue_worker_threads", [])
+    running = sum(1 for t in threads if t.is_alive())
+
+    combined_stats: dict = {}
+    for w in workers:
+        for k, v in w.stats.items():
+            combined_stats[k] = combined_stats.get(k, 0) + v
+
     return {
         "status": "healthy",
-        "agent_status": agent_status,
+        "agent_status": "ready" if relevancy_agent else "not_initialized",
         "query_agent_status": "ready" if query_agent else "not_initialized",
-        "worker_status": worker_status,
-        "worker_stats": worker.stats if worker else None,
+        "worker_status": f"{running}/{len(workers)} running",
+        "worker_stats": combined_stats or None,
     }
 
 
