@@ -1,5 +1,7 @@
 # Baulog
 
+**Frontend:** [bau-log.lovable.app](https://bau-log.lovable.app/)
+
 Property management document processing system. Accepts uploaded files (PDF, CSV, EML, audio), classifies them against a Markdown-based property registry using LangChain and Google Gemini, updates the relevant section in the property file, and exposes a natural-language query interface over the registry. Every content update is checkpointed via a custom [Entire.io](https://entire.io) external agent plugin, creating a versioned audit trail of all property file changes.
 
 ## Architecture
